@@ -135,10 +135,6 @@
                         <option value="">Select a category</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="feedDescription">Description (Optional)</label>
-                    <textarea id="feedDescription" name="description" rows="3"></textarea>
-                </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-outline" onclick="closeModal('addFeedModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add Feed</button>
@@ -167,7 +163,7 @@
                     window.location.href = '/index.html';
                 }
             } catch (error) {
-                window.location.href = `${API_BASE_URL}/auth/login`;
+                window.location.href = `${API_BASE_URL}/login`;
             }
         }
 
@@ -348,8 +344,7 @@
                 const feedData = {
                     name: formData.get('name'),
                     url: formData.get('url'),
-                    category_id: parseInt(formData.get('category_id')),
-                    description: formData.get('description')
+                    category_id: parseInt(formData.get('category_id'))
                 };
                 
                 try {
@@ -427,10 +422,10 @@
         // Logout function
         async function logout() {
             try {
-                await apiCall('/auth/logout', { method: 'POST' });
-                window.location.href = `${API_BASE_URL}/auth/login`;
+                await apiCall('/logout', { method: 'POST' });
+                window.location.href = `${API_BASE_URL}/login`;
             } catch (error) {
-                window.location.href = `${API_BASE_URL}/auth/login`;
+                window.location.href = `${API_BASE_URL}/login`;
             }
         }
 

@@ -320,11 +320,42 @@ def create_app():
         session.clear()
         return "Session cleared. <a href='/'>Go to home</a>"
 
-    @app.route('/api/feeds')
+    @app.route('/api/feeds', methods=['GET', 'POST'])
     @login_required
     @requires_tbmcg_email
-    def get_feeds():
-        """Get all feeds organized by category"""
+    @requires_feed_management
+    def handle_feeds():
+        """Handle GET and POST requests for feeds"""
+        if request.method == 'POST':
+            # Add new feed
+            data = request.json
+            user_id = session.get('user', {}).get('oid')
+            
+            feed = Feed(
+                name=data['name'],
+                url=data['url'],
+                category_id=data['category_id'],
+                created_by=user_id
+            )
+            
+            try:
+                db.session.add(feed)
+                db.session.commit()
+                return jsonify({
+                    'message': 'Feed added successfully',
+                    'feed': {
+                        'id': feed.id,
+                        'name': feed.name,
+                        'url': feed.url,
+                        'category_id': feed.category_id,
+                        'enabled': feed.enabled
+                    }
+                }), 201
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({'error': str(e)}), 400
+        
+        # GET request - return all feeds organized by category
         categories = Category.query.all()
         result = []
         

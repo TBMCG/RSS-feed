@@ -143,7 +143,7 @@
                 }
             } catch (error) {
                 // Redirect to login if not authenticated
-                window.location.href = `${API_BASE_URL}/auth/login`;
+                window.location.href = `${API_BASE_URL}/login`;
             }
         }
 
@@ -318,10 +318,10 @@
         // Logout function
         async function logout() {
             try {
-                await apiCall('/auth/logout', { method: 'POST' });
-                window.location.href = `${API_BASE_URL}/auth/login`;
+                await apiCall('/logout', { method: 'POST' });
+                window.location.href = `${API_BASE_URL}/login`;
             } catch (error) {
-                window.location.href = `${API_BASE_URL}/auth/login`;
+                window.location.href = `${API_BASE_URL}/login`;
             }
         }
     </script>

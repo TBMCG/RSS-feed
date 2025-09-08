@@ -11,3 +11,5 @@ build/
 package-lock.json
 npm-debug.log*
 yarn-error.log*
+# Local Netlify folder
+.netlify
