@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TBMCG News Dashboard</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" type="image/svg+xml" href="/static/custom-logo.svg">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <img src="/static/custom-logo.svg" alt="TBMCG Logo" class="nav-logo">
+                <span class="nav-title">TBMCG News</span>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link active">
+                    <span class="material-icons">dashboard</span>
+                    Dashboard
+                </a>
+                <a href="/manage.html" class="nav-link" id="manageLink" style="display: none;">
+                    <span class="material-icons">settings</span>
+                    Manage
+                </a>
+                <a href="#" class="nav-link" onclick="logout()">
+                    <span class="material-icons">logout</span>
+                    Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages Container -->
+    <div class="flash-container" id="flashContainer"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="dashboard-container">
+            <!-- Header -->
+            <div class="dashboard-header">
+                <div class="header-info">
+                    <h1>RSS Feed Dashboard</h1>
+                    <p>Welcome back! Stay updated with the latest news.</p>
+                </div>
+                <button class="btn btn-primary" onclick="refreshFeeds()">
+                    <span class="material-icons">refresh</span>
+                    Refresh Feeds
+                </button>
+            </div>
+
+            <!-- Dashboard Grid -->
+            <div class="dashboard-grid">
+                <!-- Sidebar -->
+                <div class="sidebar">
+                    <!-- Statistics -->
+                    <div class="stats-card">
+                        <h3>Statistics</h3>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Articles</span>
+                            <span class="stat-value" id="totalArticles">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Active Feeds</span>
+                            <span class="stat-value" id="activeFeeds">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Categories</span>
+                            <span class="stat-value" id="totalCategories">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Categories -->
+                    <div class="categories-card">
+                        <h3>Categories</h3>
+                        <div class="category-list" id="categoryList">
+                            <!-- Categories will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="main-content-area">
+                    <!-- Search Bar -->
+                    <div class="search-container">
+                        <div class="search-input">
+                            <span class="material-icons">search</span>
+                            <input type="text" id="searchInput" placeholder="Search articles...">
+                        </div>
+                    </div>
+
+                    <!-- Articles -->
+                    <div class="articles-container">
+                        <div class="articles-grid" id="articlesGrid">
+                            <!-- Articles will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Load More -->
+                    <div class="load-more-container" id="loadMoreContainer" style="display: none;">
+                        <button class="btn btn-outline" onclick="loadMoreArticles()">
+                            Load More Articles
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        let allArticles = [];
+        let filteredArticles = [];
+        let currentCategory = null;
+        let articlesPerPage = 20;
+        let currentPage = 1;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthentication();
+            loadCategories();
+            loadArticles();
+            setupSearch();
+        });
+
+        // Check authentication status
+        async function checkAuthentication() {
+            try {
+                const response = await apiCall('/api/user');
+                if (response.user && response.user.role === 'Admin') {
+                    document.getElementById('manageLink').style.display = 'flex';
+                }
+            } catch (error) {
+                // Redirect to login if not authenticated
+                window.location.href = `${API_BASE_URL}/auth/login`;
+            }
+        }
+
+        // Load categories
+        async function loadCategories() {
+            try {
+                const categories = await apiCall('/api/feeds');
+                
+                const categoryList = document.getElementById('categoryList');
+                const totalCategories = document.getElementById('totalCategories');
+                
+                let totalActiveFeeds = 0;
+                let categoryHTML = `
+                    <div class="category-item ${currentCategory === null ? 'active' : ''}" onclick="selectCategory(null)">
+                        <span class="material-icons category-icon">category</span>
+                        <span class="category-name">All Categories</span>
+                        <span class="category-count">${categories.reduce((acc, cat) => acc + cat.feeds.filter(f => f.enabled).length, 0)} feeds</span>
+                    </div>
+                `;
+                
+                categories.forEach(category => {
+                    const activeFeeds = category.feeds.filter(f => f.enabled).length;
+                    totalActiveFeeds += activeFeeds;
+                    
+                    categoryHTML += `
+                        <div class="category-item ${currentCategory === category.id ? 'active' : ''}" onclick="selectCategory(${category.id})">
+                            <span class="material-icons category-icon" style="color: ${category.color}">folder</span>
+                            <span class="category-name">${category.name}</span>
+                            <span class="category-count">${activeFeeds} feeds</span>
+                        </div>
+                    `;
+                });
+                
+                categoryList.innerHTML = categoryHTML;
+                totalCategories.textContent = categories.length;
+                document.getElementById('activeFeeds').textContent = totalActiveFeeds;
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        // Select category
+        function selectCategory(categoryId) {
+            currentCategory = categoryId;
+            currentPage = 1;
+            
+            // Update active state
+            document.querySelectorAll('.category-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            event.target.closest('.category-item').classList.add('active');
+            
+            loadArticles();
+        }
+
+        // Load articles
+        async function loadArticles() {
+            toggleLoading(true);
+            
+            try {
+                const endpoint = currentCategory ? `/api/articles?category_id=${currentCategory}` : '/api/articles';
+                const articles = await apiCall(endpoint);
+                
+                allArticles = articles;
+                filteredArticles = articles;
+                currentPage = 1;
+                
+                displayArticles();
+                document.getElementById('totalArticles').textContent = articles.length;
+            } catch (error) {
+                console.error('Error loading articles:', error);
+                showNotification('Failed to load articles. Please try again.', 'error');
+            }
+            
+            toggleLoading(false);
+        }
+
+        // Display articles
+        function displayArticles() {
+            const articlesGrid = document.getElementById('articlesGrid');
+            const startIndex = 0;
+            const endIndex = currentPage * articlesPerPage;
+            const articlesToShow = filteredArticles.slice(startIndex, endIndex);
+            
+            if (articlesToShow.length === 0) {
+                articlesGrid.innerHTML = `
+                    <div class="no-articles">
+                        <span class="material-icons">rss_feed</span>
+                        <h3>No articles found</h3>
+                        <p>Try refreshing the feeds or adjusting your search.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let articlesHTML = '';
+            articlesToShow.forEach(article => {
+                const publishedDate = article.published ? formatDate(article.published) : 'Unknown date';
+                const description = stripHtml(article.description);
+                const truncatedDescription = truncateText(description, 150);
+                
+                articlesHTML += `
+                    <div class="article-card">
+                        <div class="article-meta">
+                            <span class="feed-name">${article.feed_name}</span>
+                            <span class="article-date">${publishedDate}</span>
+                        </div>
+                        <h3 class="article-title">
+                            <a href="${article.link}" target="_blank" rel="noopener noreferrer">
+                                ${article.title}
+                            </a>
+                        </h3>
+                        <p class="article-description">${truncatedDescription}</p>
+                        <div class="article-actions">
+                            <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
+                                <span class="material-icons">open_in_new</span>
+                                Read More
+                            </a>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            articlesGrid.innerHTML = articlesHTML;
+            
+            // Show/hide load more button
+            const loadMoreContainer = document.getElementById('loadMoreContainer');
+            if (endIndex < filteredArticles.length) {
+                loadMoreContainer.style.display = 'block';
+            } else {
+                loadMoreContainer.style.display = 'none';
+            }
+        }
+
+        // Load more articles
+        function loadMoreArticles() {
+            currentPage++;
+            displayArticles();
+        }
+
+        // Setup search
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const debouncedSearch = debounce((query) => {
+                if (query === '') {
+                    filteredArticles = allArticles;
+                } else {
+                    filteredArticles = allArticles.filter(article => 
+                        article.title.toLowerCase().includes(query) ||
+                        article.description.toLowerCase().includes(query) ||
+                        article.feed_name.toLowerCase().includes(query)
+                    );
+                }
+                
+                currentPage = 1;
+                displayArticles();
+            }, 300);
+            
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                debouncedSearch(query);
+            });
+        }
+
+        // Refresh feeds
+        async function refreshFeeds() {
+            await loadArticles();
+            showNotification('Feeds refreshed successfully!', 'success');
+        }
+
+        // Logout function
+        async function logout() {
+            try {
+                await apiCall('/auth/logout', { method: 'POST' });
+                window.location.href = `${API_BASE_URL}/auth/login`;
+            } catch (error) {
+                window.location.href = `${API_BASE_URL}/auth/login`;
+            }
+        }
+    </script>
+</body>
+</html>

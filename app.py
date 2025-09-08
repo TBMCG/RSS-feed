@@ -2,6 +2,7 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 from functools import wraps
 import requests
 try:
@@ -16,6 +17,12 @@ from config import Config
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    
+    # Initialize CORS
+    CORS(app, 
+         origins=['*'],  # Allow all origins for now - restrict in production
+         supports_credentials=True,
+         allow_headers=['Content-Type', 'Authorization'])
     
     # Initialize Flask-Session
     Session(app)

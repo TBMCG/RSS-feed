@@ -1,17 +1,19 @@
 [build]
-  command = "pip install -r requirements.txt"
-  functions = "netlify/functions"
-  publish = "dist"
-
-[build.environment]
-  PYTHONPATH = "/opt/buildhome/python3.9/lib/python3.9/site-packages"
+  publish = "."
+  
+# Serve static files directly
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/app/:splat"
+  from = "/manage"
+  to = "/manage.html"
   status = 200
-  
+
+# Handle SPA routing - serve index.html for all other routes
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/app/:splat"
+  to = "/index.html"
   status = 200

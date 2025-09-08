@@ -21,18 +21,23 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// API Configuration
+const API_BASE_URL = 'https://tbmcg-news-dashboard.onrender.com';
+
 // Utility functions for API calls
 async function apiCall(endpoint, options = {}) {
     const defaultOptions = {
         headers: {
             'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for session management
     };
     
     const config = { ...defaultOptions, ...options };
     
     try {
-        const response = await fetch(endpoint, config);
+        const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+        const response = await fetch(url, config);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
