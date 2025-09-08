@@ -9,9 +9,9 @@ class Config:
     
     # Session configuration for persistent login
     SESSION_TYPE = 'filesystem'
-    SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+    SESSION_COOKIE_SECURE = True  # Required for HTTPS in production
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SAMESITE = 'None'  # Allow cross-domain cookies
     SESSION_PERMANENT = True
     PERMANENT_SESSION_LIFETIME = 86400  # 24 hours in seconds
     

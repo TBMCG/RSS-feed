@@ -265,11 +265,8 @@ def create_app():
     @app.route('/login')
     def login():
         """Initiate Microsoft OAuth login"""
-        if session.get('user'):
-            return redirect(url_for('index'))
-        
-        # Clear any existing auth flow
-        session.pop('flow', None)
+        # Always clear session completely to avoid redirect loops
+        session.clear()
         
         # Initiate OAuth flow with hardcoded redirect URI
         redirect_uri = 'https://tbmcg-news-dashboard.onrender.com/auth/callback'
