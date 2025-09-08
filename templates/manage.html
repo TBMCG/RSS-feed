@@ -1,0 +1,871 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Feeds - TBMCG News Dashboard{% endblock %}
+
+{% block content %}
+<div class="manage-container">
+    <!-- Header -->
+    <div class="manage-header">
+        <div class="header-info">
+            <h1>Feed Manager</h1>
+            <p>Manage RSS feeds and categories for the organization</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-outline" onclick="exportFeeds()">
+                <span class="material-icons">download</span>
+                Export
+            </button>
+            <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">
+                <span class="material-icons">upload</span>
+                Import
+            </button>
+            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importFeeds(event)">
+            <button class="btn btn-primary" onclick="showAddCategoryModal()">
+                <span class="material-icons">create_new_folder</span>
+                Add Category
+            </button>
+            <button class="btn btn-primary" onclick="showAddFeedModal()">
+                <span class="material-icons">add</span>
+                Add Feed
+            </button>
+        </div>
+    </div>
+
+    <!-- Categories -->
+    <div class="categories-container" id="categoriesContainer">
+        <!-- Categories will be populated by JavaScript -->
+    </div>
+</div>
+
+<!-- Add/Edit Category Modal -->
+<div class="modal" id="categoryModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="categoryModalTitle">Add Category</h2>
+            <button class="modal-close" onclick="closeCategoryModal()">
+                <span class="material-icons">close</span>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="categoryForm">
+                <input type="hidden" id="categoryId">
+                <div class="form-group">
+                    <label for="categoryName">Category Name</label>
+                    <input type="text" id="categoryName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="categoryColor">Category Color</label>
+                    <input type="color" id="categoryColor" name="color" value="#6366f1">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeCategoryModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveCategory()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Feed Modal -->
+<div class="modal" id="feedModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="feedModalTitle">Add Feed</h2>
+            <button class="modal-close" onclick="closeFeedModal()">
+                <span class="material-icons">close</span>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="feedForm">
+                <input type="hidden" id="feedId">
+                <div class="form-group">
+                    <label for="feedName">Feed Name</label>
+                    <input type="text" id="feedName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="feedUrl">Feed URL</label>
+                    <input type="url" id="feedUrl" name="url" placeholder="https://example.com/rss" required>
+                </div>
+                <div class="form-group">
+                    <label for="feedCategory">Category</label>
+                    <select id="feedCategory" name="category_id" required>
+                        <!-- Options populated by JavaScript -->
+                    </select>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeFeedModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveFeed()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal" id="confirmModal">
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h2>Confirm Action</h2>
+        </div>
+        <div class="modal-body">
+            <p id="confirmMessage"></p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeConfirmModal()">Cancel</button>
+            <button class="btn btn-primary btn-danger" id="confirmButton">Delete</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let categories = [];
+let currentEditingCategory = null;
+let currentEditingFeed = null;
+let confirmAction = null;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    loadCategories();
+});
+
+// Load categories and feeds
+async function loadCategories() {
+    toggleLoading(true);
+    
+    try {
+        const response = await fetch('/api/feeds');
+        categories = await response.json();
+        displayCategories();
+        populateCategorySelect();
+    } catch (error) {
+        console.error('Error loading categories:', error);
+        showNotification('Failed to load categories', 'error');
+    }
+    
+    toggleLoading(false);
+}
+
+// Display categories
+function displayCategories() {
+    const container = document.getElementById('categoriesContainer');
+    
+    if (categories.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <span class="material-icons">folder_open</span>
+                <h3>No categories yet</h3>
+                <p>Create your first category to organize RSS feeds</p>
+                <button class="btn btn-primary" onclick="showAddCategoryModal()">
+                    <span class="material-icons">create_new_folder</span>
+                    Add Category
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    categories.forEach(category => {
+        const activeFeeds = category.feeds.filter(f => f.enabled).length;
+        
+        html += `
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-info">
+                        <span class="material-icons category-icon" style="color: ${category.color}">folder</span>
+                        <div>
+                            <h3>${category.name}</h3>
+                            <p>${category.feeds.length} feeds (${activeFeeds} active)</p>
+                        </div>
+                    </div>
+                    <div class="category-actions">
+                        <button class="btn-icon" onclick="editCategory(${category.id})" title="Edit Category">
+                            <span class="material-icons">edit</span>
+                        </button>
+                        <button class="btn-icon btn-danger" onclick="confirmDeleteCategory(${category.id}, '${category.name}')" title="Delete Category">
+                            <span class="material-icons">delete</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="feeds-list">
+                    ${category.feeds.length === 0 ? 
+                        '<p class="no-feeds">No feeds in this category</p>' :
+                        category.feeds.map(feed => `
+                            <div class="feed-item ${feed.enabled ? 'enabled' : 'disabled'}">
+                                <div class="feed-info">
+                                    <span class="material-icons feed-icon">${feed.enabled ? 'rss_feed' : 'rss_feed'}</span>
+                                    <div>
+                                        <h4>${feed.name}</h4>
+                                        <p class="feed-url">${feed.url}</p>
+                                    </div>
+                                </div>
+                                <div class="feed-actions">
+                                    <label class="toggle-switch" title="${feed.enabled ? 'Disable' : 'Enable'} feed">
+                                        <input type="checkbox" ${feed.enabled ? 'checked' : ''} 
+                                               onchange="toggleFeed(${feed.id}, this.checked)">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <button class="btn-icon" onclick="editFeed(${feed.id}, ${category.id})" title="Edit Feed">
+                                        <span class="material-icons">edit</span>
+                                    </button>
+                                    <button class="btn-icon btn-danger" onclick="confirmDeleteFeed(${feed.id}, '${feed.name}')" title="Delete Feed">
+                                        <span class="material-icons">delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')
+                    }
+                </div>
+                
+                <div class="category-footer">
+                    <button class="btn btn-outline btn-sm" onclick="showAddFeedModal(${category.id})">
+                        <span class="material-icons">add</span>
+                        Add Feed
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Populate category select in feed modal
+function populateCategorySelect() {
+    const select = document.getElementById('feedCategory');
+    select.innerHTML = categories.map(cat => 
+        `<option value="${cat.id}" style="color: ${cat.color}">${cat.name}</option>`
+    ).join('');
+}
+
+// Category Modal Functions
+function showAddCategoryModal() {
+    currentEditingCategory = null;
+    document.getElementById('categoryModalTitle').textContent = 'Add Category';
+    document.getElementById('categoryId').value = '';
+    document.getElementById('categoryName').value = '';
+    document.getElementById('categoryColor').value = '#6366f1';
+    document.getElementById('categoryModal').style.display = 'flex';
+}
+
+function editCategory(categoryId) {
+    currentEditingCategory = categoryId;
+    const category = categories.find(c => c.id === categoryId);
+    
+    document.getElementById('categoryModalTitle').textContent = 'Edit Category';
+    document.getElementById('categoryId').value = categoryId;
+    document.getElementById('categoryName').value = category.name;
+    document.getElementById('categoryColor').value = category.color;
+    document.getElementById('categoryModal').style.display = 'flex';
+}
+
+function closeCategoryModal() {
+    document.getElementById('categoryModal').style.display = 'none';
+    currentEditingCategory = null;
+}
+
+async function saveCategory() {
+    const form = document.getElementById('categoryForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    try {
+        const url = currentEditingCategory ? 
+            `/api/categories/${currentEditingCategory}` : 
+            '/api/categories';
+        
+        const method = currentEditingCategory ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeCategoryModal();
+            loadCategories();
+            showNotification(
+                currentEditingCategory ? 'Category updated successfully' : 'Category added successfully', 
+                'success'
+            );
+        } else {
+            throw new Error('Failed to save category');
+        }
+    } catch (error) {
+        console.error('Error saving category:', error);
+        showNotification('Failed to save category', 'error');
+    }
+}
+
+function confirmDeleteCategory(categoryId, categoryName) {
+    document.getElementById('confirmMessage').textContent = 
+        `Are you sure you want to delete the category "${categoryName}"? This will also delete all feeds in this category.`;
+    
+    confirmAction = () => deleteCategory(categoryId);
+    document.getElementById('confirmModal').style.display = 'flex';
+}
+
+async function deleteCategory(categoryId) {
+    try {
+        const response = await fetch(`/api/categories/${categoryId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            closeConfirmModal();
+            loadCategories();
+            showNotification('Category deleted successfully', 'success');
+        } else {
+            throw new Error('Failed to delete category');
+        }
+    } catch (error) {
+        console.error('Error deleting category:', error);
+        showNotification('Failed to delete category', 'error');
+    }
+}
+
+// Feed Modal Functions
+function showAddFeedModal(categoryId = null) {
+    currentEditingFeed = null;
+    document.getElementById('feedModalTitle').textContent = 'Add Feed';
+    document.getElementById('feedId').value = '';
+    document.getElementById('feedName').value = '';
+    document.getElementById('feedUrl').value = '';
+    
+    if (categoryId) {
+        document.getElementById('feedCategory').value = categoryId;
+    }
+    
+    document.getElementById('feedModal').style.display = 'flex';
+}
+
+function editFeed(feedId, categoryId) {
+    currentEditingFeed = feedId;
+    const category = categories.find(c => c.id === categoryId);
+    const feed = category.feeds.find(f => f.id === feedId);
+    
+    document.getElementById('feedModalTitle').textContent = 'Edit Feed';
+    document.getElementById('feedId').value = feedId;
+    document.getElementById('feedName').value = feed.name;
+    document.getElementById('feedUrl').value = feed.url;
+    document.getElementById('feedCategory').value = categoryId;
+    document.getElementById('feedModal').style.display = 'flex';
+}
+
+function closeFeedModal() {
+    document.getElementById('feedModal').style.display = 'none';
+    currentEditingFeed = null;
+}
+
+async function saveFeed() {
+    const form = document.getElementById('feedForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    try {
+        const url = currentEditingFeed ? 
+            `/api/feeds/${currentEditingFeed}` : 
+            '/api/feeds';
+        
+        const method = currentEditingFeed ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeFeedModal();
+            loadCategories();
+            showNotification(
+                currentEditingFeed ? 'Feed updated successfully' : 'Feed added successfully', 
+                'success'
+            );
+        } else {
+            throw new Error('Failed to save feed');
+        }
+    } catch (error) {
+        console.error('Error saving feed:', error);
+        showNotification('Failed to save feed', 'error');
+    }
+}
+
+async function toggleFeed(feedId, enabled) {
+    try {
+        const response = await fetch(`/api/feeds/${feedId}/toggle`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+        
+        if (response.ok) {
+            loadCategories();
+            showNotification(
+                enabled ? 'Feed enabled' : 'Feed disabled', 
+                'success'
+            );
+        } else {
+            throw new Error('Failed to toggle feed');
+        }
+    } catch (error) {
+        console.error('Error toggling feed:', error);
+        showNotification('Failed to update feed status', 'error');
+    }
+}
+
+function confirmDeleteFeed(feedId, feedName) {
+    document.getElementById('confirmMessage').textContent = 
+        `Are you sure you want to delete the feed "${feedName}"?`;
+    
+    confirmAction = () => deleteFeed(feedId);
+    document.getElementById('confirmModal').style.display = 'flex';
+}
+
+async function deleteFeed(feedId) {
+    try {
+        const response = await fetch(`/api/feeds/${feedId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            closeConfirmModal();
+            loadCategories();
+            showNotification('Feed deleted successfully', 'success');
+        } else {
+            throw new Error('Failed to delete feed');
+        }
+    } catch (error) {
+        console.error('Error deleting feed:', error);
+        showNotification('Failed to delete feed', 'error');
+    }
+}
+
+// Confirmation Modal
+function closeConfirmModal() {
+    document.getElementById('confirmModal').style.display = 'none';
+    confirmAction = null;
+}
+
+document.getElementById('confirmButton').addEventListener('click', function() {
+    if (confirmAction) {
+        confirmAction();
+    }
+});
+
+// Import/Export Functions
+function exportFeeds() {
+    const data = {
+        categories: categories,
+        exportDate: new Date().toISOString(),
+        version: '1.0'
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tbmcg-feeds-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showNotification('Feeds exported successfully', 'success');
+}
+
+async function importFeeds(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        
+        if (!data.categories || !Array.isArray(data.categories)) {
+            throw new Error('Invalid file format');
+        }
+        
+        const response = await fetch('/api/feeds/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            loadCategories();
+            showNotification('Feeds imported successfully', 'success');
+        } else {
+            throw new Error('Failed to import feeds');
+        }
+    } catch (error) {
+        console.error('Error importing feeds:', error);
+        showNotification('Failed to import feeds. Please check the file format.', 'error');
+    }
+    
+    // Reset file input
+    event.target.value = '';
+}
+
+// Close modals when clicking outside
+document.addEventListener('click', function(event) {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+});
+</script>
+
+<style>
+/* Additional styles for management page */
+.manage-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.manage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--spacing-2xl);
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+}
+
+.header-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.categories-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: var(--spacing-xl);
+}
+
+.category-card {
+    background: var(--bg-paper);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.category-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.category-icon {
+    font-size: 32px;
+}
+
+.category-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.feeds-list {
+    margin-bottom: var(--spacing-lg);
+}
+
+.feed-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-sm);
+    transition: var(--transition-hover);
+}
+
+.feed-item.disabled {
+    opacity: 0.6;
+}
+
+.feed-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+    min-width: 0;
+}
+
+.feed-icon {
+    color: var(--primary-main);
+}
+
+.feed-item h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.feed-url {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.feed-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: var(--gray-500);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    border-radius: 50%;
+    transition: var(--transition-hover);
+}
+
+.btn-icon:hover {
+    background: var(--gray-100);
+    color: var(--primary-main);
+}
+
+.btn-icon.btn-danger:hover {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--gray-300);
+    border-radius: 24px;
+    transition: var(--transition-hover);
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 2px;
+    bottom: 2px;
+    background: white;
+    border-radius: 50%;
+    transition: var(--transition-hover);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--primary-main);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+}
+
+.no-feeds {
+    text-align: center;
+    color: var(--gray-500);
+    font-style: italic;
+    padding: var(--spacing-lg);
+}
+
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-2xl);
+    color: var(--gray-500);
+}
+
+.empty-state .material-icons {
+    font-size: 48px;
+    margin-bottom: var(--spacing-md);
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+}
+
+.modal-content {
+    background: var(--bg-paper);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+.modal-sm .modal-content {
+    max-width: 400px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--gray-500);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    border-radius: 50%;
+    transition: var(--transition-hover);
+}
+
+.modal-close:hover {
+    background: var(--gray-100);
+    color: var(--gray-900);
+}
+
+.modal-body {
+    padding: var(--spacing-lg);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-lg);
+    border-top: 1px solid var(--gray-200);
+}
+
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-family);
+    font-size: 1rem;
+    transition: var(--transition-hover);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary-main);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.btn-danger {
+    background: #dc2626 !important;
+}
+
+.btn-danger:hover {
+    background: #b91c1c !important;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .categories-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .manage-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .header-actions {
+        justify-content: stretch;
+    }
+    
+    .header-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 600px) {
+    .feed-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+    }
+    
+    .feed-actions {
+        justify-content: space-between;
+    }
+}
+</style>
+{% endblock %}

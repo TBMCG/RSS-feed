@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TBMCG News Dashboard{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='custom-logo.svg') }}">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Material Design Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <img src="{{ url_for('static', filename='custom-logo.svg') }}" alt="TBMCG Logo" class="nav-logo">
+                <span class="nav-title">TBMCG News Dashboard</span>
+            </div>
+            
+            {% if user %}
+            <div class="nav-menu">
+                <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+                    <span class="material-icons">dashboard</span>
+                    Dashboard
+                </a>
+                {% if user.can_manage_feeds %}
+                <a href="{{ url_for('manage_feeds') }}" class="nav-link {% if request.endpoint == 'manage_feeds' %}active{% endif %}">
+                    <span class="material-icons">settings</span>
+                    Manage Feeds
+                </a>
+                {% endif %}
+            </div>
+            
+            <div class="nav-user">
+                <div class="user-info">
+                    <span class="user-avatar">{{ (user.get('name') or user.get('preferred_username', 'U'))[0].upper() }}</span>
+                    <span class="user-name">{{ user.get('name') or user.get('preferred_username', 'User') }}</span>
+                </div>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline">
+                    <span class="material-icons">logout</span>
+                    Logout
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-container">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                <span class="material-icons">
+                    {% if category == 'error' %}error{% elif category == 'success' %}check_circle{% else %}info{% endif %}
+                </span>
+                {{ message }}
+                <button class="alert-close" onclick="this.parentElement.remove()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Loading feeds...</p>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

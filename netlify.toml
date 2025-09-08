@@ -1,0 +1,17 @@
+[build]
+  command = "pip install -r requirements.txt"
+  functions = "netlify/functions"
+  publish = "dist"
+
+[build.environment]
+  PYTHONPATH = "/opt/buildhome/python3.9/lib/python3.9/site-packages"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/app/:splat"
+  status = 200
+  
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/app/:splat"
+  status = 200

@@ -1,0 +1,48 @@
+# Azure Container Apps configuration
+apiVersion: 2022-03-01
+location: eastus
+name: tbmcg-news-dashboard
+properties:
+  managedEnvironmentId: /subscriptions/{subscription-id}/resourceGroups/{rg-name}/providers/Microsoft.App/managedEnvironments/{env-name}
+  configuration:
+    ingress:
+      external: true
+      targetPort: 8000
+      transport: http
+      traffic:
+        - weight: 100
+          latestRevision: true
+    secrets:
+      - name: database-url
+        value: ""  # Set in Azure Portal
+      - name: microsoft-client-id
+        value: ""  # Set in Azure Portal
+      - name: microsoft-client-secret
+        value: ""  # Set in Azure Portal
+      - name: microsoft-tenant-id
+        value: ""  # Set in Azure Portal
+      - name: secret-key
+        value: ""  # Set in Azure Portal
+  template:
+    containers:
+      - name: tbmcg-news-dashboard
+        image: tbmcgnewsdashboard.azurecr.io/tbmcg-news-dashboard:latest
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        env:
+          - name: DATABASE_URL
+            secretRef: database-url
+          - name: MICROSOFT_CLIENT_ID
+            secretRef: microsoft-client-id
+          - name: MICROSOFT_CLIENT_SECRET
+            secretRef: microsoft-client-secret
+          - name: MICROSOFT_TENANT_ID
+            secretRef: microsoft-tenant-id
+          - name: SECRET_KEY
+            secretRef: secret-key
+          - name: FLASK_ENV
+            value: production
+    scale:
+      minReplicas: 0  # Scale to zero when not used (saves money!)
+      maxReplicas: 3

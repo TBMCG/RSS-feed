@@ -1,0 +1,26 @@
+[
+    {
+        "id": "admin-role-guid-here",
+        "displayName": "Admin",
+        "description": "Full access to manage feeds, categories, and users",
+        "value": "admin",
+        "isEnabled": true,
+        "allowedMemberTypes": ["User"]
+    },
+    {
+        "id": "editor-role-guid-here", 
+        "displayName": "Editor",
+        "description": "Can manage feeds and categories",
+        "value": "editor",
+        "isEnabled": true,
+        "allowedMemberTypes": ["User"]
+    },
+    {
+        "id": "viewer-role-guid-here",
+        "displayName": "Viewer", 
+        "description": "Read-only access to view feeds",
+        "value": "viewer",
+        "isEnabled": true,
+        "allowedMemberTypes": ["User"]
+    }
+]
