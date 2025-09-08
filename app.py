@@ -271,10 +271,11 @@ def create_app():
         # Clear any existing auth flow
         session.pop('flow', None)
         
-        # Initiate OAuth flow
+        # Initiate OAuth flow with hardcoded redirect URI
+        redirect_uri = 'https://tbmcg-news-dashboard.onrender.com/auth/callback'
         flow = msal_app.initiate_auth_code_flow(
             scopes=app.config['SCOPE'],
-            redirect_uri=url_for('authorized', _external=True)
+            redirect_uri=redirect_uri
         )
         
         if 'error' in flow:
@@ -341,16 +342,11 @@ def create_app():
             
             flash(f'Welcome, {db_user.name or email}!', 'success')
             
-            # Redirect to frontend URL (Netlify in production)
-            frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5000')
-            
-            # For cross-domain deployments, generate and pass JWT token
-            if frontend_url != 'http://localhost:5000':
-                auth_token = generate_auth_token(user_claims)
-                return redirect(f"{frontend_url}?token={auth_token}")
-            else:
-                # For local development, use session-based auth
-                return redirect(frontend_url)
+            # Hardcoded redirect to Netlify frontend with JWT token
+            # Always generate JWT token for cross-domain authentication
+            auth_token = generate_auth_token(user_claims)
+            netlify_url = 'https://tbm-rss-feed.netlify.app'
+            return redirect(f"{netlify_url}?token={auth_token}")
             
         except Exception as e:
             print(f"DEBUG: Exception during authentication: {e}")
