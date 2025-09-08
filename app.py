@@ -20,8 +20,13 @@ def create_app():
     app.config.from_object(Config)
     
     # Initialize CORS
+    allowed_origins = [
+        'http://localhost:5000',
+        'https://tbm-rss-feed.netlify.app',
+        'https://tbmcg-news-dashboard.onrender.com'
+    ]
     CORS(app, 
-         origins=['*'],  # Allow all origins for now - restrict in production
+         origins=allowed_origins,
          supports_credentials=True,
          allow_headers=['Content-Type', 'Authorization'])
     
