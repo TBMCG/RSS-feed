@@ -150,6 +150,9 @@
 
         // Initialize manage page
         document.addEventListener('DOMContentLoaded', function() {
+            // Extract token from URL if present (after OAuth redirect)
+            TokenManager.extractTokenFromURL();
+            
             checkAdminAccess();
             loadCategories();
             setupForms();

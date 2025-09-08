@@ -128,6 +128,9 @@
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
+            // Extract token from URL if present (after OAuth redirect)
+            TokenManager.extractTokenFromURL();
+            
             checkAuthentication();
             loadCategories();
             loadArticles();
@@ -319,8 +322,11 @@
         async function logout() {
             try {
                 await apiCall('/logout', { method: 'POST' });
-                window.location.href = `${API_BASE_URL}/login`;
             } catch (error) {
+                console.log('Logout API call failed, but continuing...');
+            } finally {
+                // Clear stored token
+                TokenManager.removeToken();
                 window.location.href = `${API_BASE_URL}/login`;
             }
         }

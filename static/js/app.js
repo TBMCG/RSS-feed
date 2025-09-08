@@ -24,6 +24,26 @@ document.addEventListener('DOMContentLoaded', function() {
 // API Configuration
 const API_BASE_URL = 'https://tbmcg-news-dashboard.onrender.com';
 
+// JWT Token management
+const TokenManager = {
+    getToken: () => localStorage.getItem('auth_token'),
+    setToken: (token) => localStorage.setItem('auth_token', token),
+    removeToken: () => localStorage.removeItem('auth_token'),
+    
+    // Extract token from URL parameters (after OAuth redirect)
+    extractTokenFromURL: () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        if (token) {
+            TokenManager.setToken(token);
+            // Remove token from URL for security
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return token;
+        }
+        return null;
+    }
+};
+
 // Utility functions for API calls
 async function apiCall(endpoint, options = {}) {
     const defaultOptions = {
@@ -33,13 +53,26 @@ async function apiCall(endpoint, options = {}) {
         credentials: 'include', // Include cookies for session management
     };
     
+    // Add JWT token to headers if available
+    const token = TokenManager.getToken();
+    if (token) {
+        defaultOptions.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const config = { ...defaultOptions, ...options };
+    if (config.headers && defaultOptions.headers) {
+        config.headers = { ...defaultOptions.headers, ...config.headers };
+    }
     
     try {
         const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
         const response = await fetch(url, config);
         
         if (!response.ok) {
+            // If token is invalid, remove it and redirect to login
+            if (response.status === 401 && token) {
+                TokenManager.removeToken();
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         

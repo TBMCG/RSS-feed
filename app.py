@@ -12,6 +12,7 @@ except ImportError:
 from datetime import datetime, timedelta
 import json
 import msal
+import jwt
 from config import Config
 
 def create_app():
@@ -90,13 +91,64 @@ def create_app():
         db.session.commit()
         return user
     
+    def generate_auth_token(user_claims):
+        """Generate JWT token for cross-domain authentication"""
+        payload = {
+            'user_id': user_claims.get('oid'),
+            'email': user_claims.get('preferred_username'),
+            'name': user_claims.get('name'),
+            'exp': datetime.utcnow() + timedelta(hours=24),  # Token expires in 24 hours
+            'iat': datetime.utcnow()
+        }
+        return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+    
+    def verify_auth_token(token):
+        """Verify and decode JWT token"""
+        try:
+            payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            return payload
+        except jwt.ExpiredSignatureError:
+            return None  # Token expired
+        except jwt.InvalidTokenError:
+            return None  # Invalid token
+    
+    def get_user_from_token():
+        """Get user info from JWT token in Authorization header"""
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return None
+        
+        token = auth_header.split(' ')[1]
+        payload = verify_auth_token(token)
+        if not payload:
+            return None
+            
+        return payload
+    
     def login_required(f):
-        """Decorator to require authentication"""
+        """Decorator to require authentication (supports both session and JWT token)"""
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if not session.get('user'):
-                return redirect(url_for('login', next=request.url))
-            return f(*args, **kwargs)
+            # First try session-based auth (for local development and traditional web flow)
+            if session.get('user'):
+                return f(*args, **kwargs)
+            
+            # Then try token-based auth (for cross-domain API calls)
+            token_user = get_user_from_token()
+            if token_user:
+                # Set session for compatibility with existing code
+                session['user'] = {
+                    'oid': token_user.get('user_id'),
+                    'preferred_username': token_user.get('email'),
+                    'name': token_user.get('name')
+                }
+                return f(*args, **kwargs)
+            
+            # For API endpoints, return JSON error instead of redirect
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            return redirect(url_for('login', next=request.url))
         return decorated_function
 
     def requires_tbmcg_email(f):
@@ -286,7 +338,14 @@ def create_app():
             
             # Redirect to frontend URL (Netlify in production)
             frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5000')
-            return redirect(frontend_url)
+            
+            # For cross-domain deployments, generate and pass JWT token
+            if frontend_url != 'http://localhost:5000':
+                auth_token = generate_auth_token(user_claims)
+                return redirect(f"{frontend_url}?token={auth_token}")
+            else:
+                # For local development, use session-based auth
+                return redirect(frontend_url)
             
         except Exception as e:
             print(f"DEBUG: Exception during authentication: {e}")
@@ -624,6 +683,32 @@ def create_app():
             'can_manage_feeds': any(Roles.can_manage_feeds(role) for role in user.get_roles()),
             'can_manage_categories': any(Roles.can_manage_categories(role) for role in user.get_roles()),
             'can_manage_users': any(Roles.can_manage_users(role) for role in user.get_roles())
+        })
+    
+    @app.route('/api/user')
+    @login_required  
+    def api_user():
+        """Get current user info for frontend authentication checks"""
+        user_id = session.get('user', {}).get('oid')
+        if not user_id:
+            return jsonify({'error': 'Not authenticated'}), 401
+        
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        user_roles = user.get_roles()
+        primary_role = 'Admin' if 'Admin' in user_roles else ('Editor' if 'Editor' in user_roles else 'Viewer')
+        
+        return jsonify({
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'role': primary_role,  # Frontend expects this specific format
+                'roles': user_roles,
+                'can_manage_feeds': any(Roles.can_manage_feeds(role) for role in user_roles)
+            }
         })
     
     # Initialize default data
