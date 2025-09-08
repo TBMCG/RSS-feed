@@ -13,3 +13,7 @@ npm-debug.log*
 yarn-error.log*
 # Local Netlify folder
 .netlify
+
+# Flask session files (MUST NEVER BE COMMITTED - contains tokens)
+flask_session/
+flask_session/*

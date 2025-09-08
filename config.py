@@ -29,3 +29,6 @@ class Config:
     DATABASE_URL = os.environ.get('DATABASE_URL') or 'mssql+pymssql://localhost/tbmcg_news_dashboard'
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # Frontend URL for redirects (Netlify URL in production)
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5000')

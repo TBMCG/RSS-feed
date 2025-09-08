@@ -284,9 +284,9 @@ def create_app():
             
             flash(f'Welcome, {db_user.name or email}!', 'success')
             
-            # Redirect to next page or index
-            next_page = request.args.get('next')
-            return redirect(next_page if next_page else url_for('index'))
+            # Redirect to frontend URL (Netlify in production)
+            frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5000')
+            return redirect(frontend_url)
             
         except Exception as e:
             print(f"DEBUG: Exception during authentication: {e}")
