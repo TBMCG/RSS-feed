@@ -194,8 +194,10 @@ def create_app():
         token = auth_header.split(' ')[1]
         payload = verify_auth_token(token)
         if not payload:
+            print(f"DEBUG: Invalid or expired JWT token")
             return None
             
+        print(f"DEBUG: Valid JWT token for user: {payload.get('email')}")
         return payload
     
     def login_required(f):
@@ -427,15 +429,15 @@ def create_app():
                 # Ignore errors in cache clearing
                 pass
         
-        # Azure AD logout URL
+        # Azure AD logout URL with proper Netlify redirect
         azure_logout_url = (
             f"{app.config['AUTHORITY']}/oauth2/v2.0/logout"
-            f"?post_logout_redirect_uri=https://tbm-rss-feed.netlify.app"
+            f"?post_logout_redirect_uri=https://tbm-rss-feed.netlify.app/logout-complete"
         )
         
         # Handle API request (POST) vs web request (GET)
         if request.method == 'POST' or request.headers.get('Content-Type') == 'application/json':
-            # Return JSON response for API calls
+            # Return JSON response for API calls from Netlify frontend
             return jsonify({
                 'success': True,
                 'message': 'Logged out successfully',
@@ -451,6 +453,24 @@ def create_app():
         """Clear session - useful for debugging"""
         session.clear()
         return "Session cleared. <a href='/'>Go to home</a>"
+    
+    @app.route('/api/auth/status')
+    def auth_status():
+        """Check authentication status for debugging"""
+        user_session = session.get('user')
+        token_user = get_user_from_token()
+        
+        return jsonify({
+            'session_user': bool(user_session),
+            'session_details': {
+                'user_id': user_session.get('oid') if user_session else None,
+                'email': user_session.get('preferred_username') if user_session else None,
+                'name': user_session.get('name') if user_session else None
+            } if user_session else None,
+            'token_user': bool(token_user),
+            'token_details': token_user if token_user else None,
+            'auth_header': request.headers.get('Authorization', 'Not provided')
+        })
 
     @app.route('/api/feeds', methods=['GET', 'POST'])
     @login_required
