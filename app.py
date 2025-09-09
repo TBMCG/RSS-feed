@@ -13,25 +13,9 @@ from datetime import datetime, timedelta
 import json
 import msal
 import jwt
-import time
-from sqlalchemy.exc import OperationalError
 from config import Config
 
-def db_retry(func, max_retries=3, delay=1):
-    """Retry database operations on connection failures"""
-    for attempt in range(max_retries):
-        try:
-            return func()
-        except OperationalError as e:
-            if attempt < max_retries - 1:
-                print(f"Database operation failed (attempt {attempt + 1}/{max_retries}): {e}")
-                time.sleep(delay)
-                # Recreate database connection
-                db.session.rollback()
-                continue
-            else:
-                print(f"Database operation failed after {max_retries} attempts: {e}")
-                raise
+# Removed db_retry function - no longer needed with proper IP whitelisting
 
 def create_app():
     app = Flask(__name__)
@@ -198,14 +182,10 @@ def create_app():
                 if not user_id:
                     return redirect(url_for('login'))
                 
-                try:
-                    user = db_retry(lambda: db.session.get(User, user_id))
-                    if not user or not user.has_role(role_name):
-                        flash(f'Access denied. {role_name} role required.', 'error')
-                        return redirect(url_for('index'))
-                except OperationalError:
-                    flash('Database connection error. Please try again.', 'error')
-                    return redirect(url_for('login'))
+                user = db.session.get(User, user_id)
+                if not user or not user.has_role(role_name):
+                    flash(f'Access denied. {role_name} role required.', 'error')
+                    return redirect(url_for('index'))
                 
                 return f(*args, **kwargs)
             return decorated_function
@@ -219,12 +199,8 @@ def create_app():
             if not user_id:
                 return redirect(url_for('login'))
             
-            try:
-                user = db_retry(lambda: db.session.get(User, user_id))
-                if not user:
-                    return redirect(url_for('login'))
-            except OperationalError:
-                flash('Database connection error. Please try again.', 'error')
+            user = db.session.get(User, user_id)
+            if not user:
                 return redirect(url_for('login'))
             
             # Check if user has admin or editor role
@@ -244,15 +220,10 @@ def create_app():
         if user_data:
             user_id = user_data.get('oid')
             if user_id:
-                try:
-                    db_user = db_retry(lambda: db.session.get(User, user_id))
-                    if db_user:
-                        user_data['roles'] = db_user.get_roles()
-                        user_data['can_manage_feeds'] = any(Roles.can_manage_feeds(role) for role in user_data['roles'])
-                except OperationalError:
-                    print(f"Database error in context processor for user {user_id}")
-                    # Don't crash the template, just return user_data without roles
-                    pass
+                db_user = db.session.get(User, user_id)
+                if db_user:
+                    user_data['roles'] = db_user.get_roles()
+                    user_data['can_manage_feeds'] = any(Roles.can_manage_feeds(role) for role in user_data['roles'])
         return dict(user=user_data)
 
     def init_default_data():
@@ -330,7 +301,6 @@ def create_app():
             )
             
             if 'error' in result:
-                print(f"DEBUG: Authentication error: {result}")
                 flash(f'Authentication failed: {result.get("error_description", "Unknown error")}', 'error')
                 return render_template('error.html', error=result)
             
@@ -341,40 +311,28 @@ def create_app():
                 return redirect(url_for('login'))
             
             email = user_claims.get('preferred_username', '')
-            print(f"DEBUG: User email: {email}")
             
             # Check domain access
             if not is_allowed_domain(email):
-                print(f"DEBUG: Domain check failed for: {email}")
                 session.clear()
                 flash('Access denied. Only @tbmcg.com email addresses are allowed.', 'error')
                 return render_template('error.html', error={'error': 'unauthorized_domain', 'error_description': 'Only @tbmcg.com email addresses are allowed.'})
             
             # Extract roles from Azure AD token
             azure_roles = get_user_roles_from_token(user_claims)
-            print(f"DEBUG: Azure AD roles for {email}: {azure_roles}")
             
-            # Try to sync user to database, but don't fail auth if DB is down
-            db_user = None
-            try:
-                db_user = sync_user_to_db(user_claims, azure_roles)
-                print(f"DEBUG: User {email} synced to database with roles: {db_user.get_roles()}")
-            except Exception as db_error:
-                print(f"WARNING: Database sync failed for {email}: {db_error}")
-                # Continue without database sync - user can still authenticate
+            # Sync user to database
+            db_user = sync_user_to_db(user_claims, azure_roles)
             
             # Store user session
             session['user'] = user_claims
             session['tokens'] = result
             session.permanent = True
             
-            print(f"DEBUG: User {email} logged in successfully")
-            
             # Clear flow from session
             session.pop('flow', None)
             
-            welcome_name = db_user.name if db_user else email
-            flash(f'Welcome, {welcome_name}!', 'success')
+            flash(f'Welcome, {db_user.name or email}!', 'success')
             
             # Redirect to Netlify frontend with JWT token
             # Always generate JWT token for cross-domain authentication
@@ -383,7 +341,6 @@ def create_app():
             return redirect(f"{netlify_url}?token={auth_token}")
             
         except Exception as e:
-            print(f"DEBUG: Exception during authentication: {e}")
             session.clear()
             flash(f'Authentication error: {str(e)}', 'error')
             return redirect(url_for('login'))
