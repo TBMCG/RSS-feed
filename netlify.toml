@@ -16,4 +16,4 @@
 [[redirects]]
   from = "/*"
   to = "/index.html"
-  status = 200
+  status = 200/* Force redeploy - Tue Sep  9 01:59:57 PM EDT 2025 */
