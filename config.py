@@ -30,5 +30,18 @@ class Config:
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Database connection pool settings for Azure SQL
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 10,          # Number of connections to maintain
+        'pool_timeout': 30,        # Timeout for getting connection from pool
+        'pool_recycle': 1800,     # Recycle connections after 30 minutes
+        'pool_pre_ping': True,    # Validate connections before use
+        'max_overflow': 20,       # Additional connections beyond pool_size
+        'connect_args': {
+            'timeout': 30,        # Connection timeout in seconds
+            'login_timeout': 30   # Login timeout in seconds
+        }
+    }
+    
     # Frontend URL for redirects (Netlify URL in production)
     FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5000')

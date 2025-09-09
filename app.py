@@ -13,7 +13,25 @@ from datetime import datetime, timedelta
 import json
 import msal
 import jwt
+import time
+from sqlalchemy.exc import OperationalError
 from config import Config
+
+def db_retry(func, max_retries=3, delay=1):
+    """Retry database operations on connection failures"""
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except OperationalError as e:
+            if attempt < max_retries - 1:
+                print(f"Database operation failed (attempt {attempt + 1}/{max_retries}): {e}")
+                time.sleep(delay)
+                # Recreate database connection
+                db.session.rollback()
+                continue
+            else:
+                print(f"Database operation failed after {max_retries} attempts: {e}")
+                raise
 
 def create_app():
     app = Flask(__name__)
@@ -33,7 +51,7 @@ def create_app():
     # Initialize Flask-Session
     Session(app)
     
-    # Initialize SQLAlchemy
+    # Initialize SQLAlchemy with engine options
     from models import db, User, Category, Feed, UserRole, Article, Roles
     db.init_app(app)
     
@@ -180,10 +198,14 @@ def create_app():
                 if not user_id:
                     return redirect(url_for('login'))
                 
-                user = db.session.get(User, user_id)
-                if not user or not user.has_role(role_name):
-                    flash(f'Access denied. {role_name} role required.', 'error')
-                    return redirect(url_for('index'))
+                try:
+                    user = db_retry(lambda: db.session.get(User, user_id))
+                    if not user or not user.has_role(role_name):
+                        flash(f'Access denied. {role_name} role required.', 'error')
+                        return redirect(url_for('index'))
+                except OperationalError:
+                    flash('Database connection error. Please try again.', 'error')
+                    return redirect(url_for('login'))
                 
                 return f(*args, **kwargs)
             return decorated_function
@@ -197,8 +219,12 @@ def create_app():
             if not user_id:
                 return redirect(url_for('login'))
             
-            user = db.session.get(User, user_id)
-            if not user:
+            try:
+                user = db_retry(lambda: db.session.get(User, user_id))
+                if not user:
+                    return redirect(url_for('login'))
+            except OperationalError:
+                flash('Database connection error. Please try again.', 'error')
                 return redirect(url_for('login'))
             
             # Check if user has admin or editor role
@@ -218,10 +244,15 @@ def create_app():
         if user_data:
             user_id = user_data.get('oid')
             if user_id:
-                db_user = db.session.get(User, user_id)
-                if db_user:
-                    user_data['roles'] = db_user.get_roles()
-                    user_data['can_manage_feeds'] = any(Roles.can_manage_feeds(role) for role in user_data['roles'])
+                try:
+                    db_user = db_retry(lambda: db.session.get(User, user_id))
+                    if db_user:
+                        user_data['roles'] = db_user.get_roles()
+                        user_data['can_manage_feeds'] = any(Roles.can_manage_feeds(role) for role in user_data['roles'])
+                except OperationalError:
+                    print(f"Database error in context processor for user {user_id}")
+                    # Don't crash the template, just return user_data without roles
+                    pass
         return dict(user=user_data)
 
     def init_default_data():
