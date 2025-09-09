@@ -412,25 +412,39 @@ def create_app():
             flash(f'Authentication error: {str(e)}', 'error')
             return redirect(url_for('login'))
 
-    @app.route('/logout')
+    @app.route('/logout', methods=['GET', 'POST'])
     def logout():
         """Log out the user"""
         session.clear()
         
         # Clear MSAL token cache if it exists
         if hasattr(msal_app, 'token_cache') and msal_app.token_cache:
-            accounts = msal_app.token_cache.find(msal.TokenCache.CredentialType.ACCOUNT)
-            for account in accounts:
-                msal_app.token_cache.remove_account(account)
+            try:
+                accounts = msal_app.token_cache.find(msal.TokenCache.CredentialType.ACCOUNT)
+                for account in accounts:
+                    msal_app.token_cache.remove_account(account)
+            except:
+                # Ignore errors in cache clearing
+                pass
         
-        flash('You have been logged out.', 'info')
-        
-        # Redirect to Azure AD logout to fully clear session
+        # Azure AD logout URL
         azure_logout_url = (
             f"{app.config['AUTHORITY']}/oauth2/v2.0/logout"
-            f"?post_logout_redirect_uri={url_for('index', _external=True)}"
+            f"?post_logout_redirect_uri=https://tbm-rss-feed.netlify.app"
         )
-        return redirect(azure_logout_url)
+        
+        # Handle API request (POST) vs web request (GET)
+        if request.method == 'POST' or request.headers.get('Content-Type') == 'application/json':
+            # Return JSON response for API calls
+            return jsonify({
+                'success': True,
+                'message': 'Logged out successfully',
+                'azure_logout_url': azure_logout_url
+            })
+        else:
+            # Traditional web logout with flash message and redirect
+            flash('You have been logged out.', 'info')
+            return redirect(azure_logout_url)
 
     @app.route('/clear-session')
     def clear_session():
