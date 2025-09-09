@@ -43,5 +43,5 @@ class Config:
         }
     }
     
-    # Frontend URL for redirects (Netlify URL in production)
+    # Frontend URL for redirects (Render URL in production)
     FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5000')
