@@ -299,8 +299,8 @@ def create_app():
         # Always clear session completely to avoid redirect loops
         session.clear()
         
-        # Initiate OAuth flow with hardcoded redirect URI
-        redirect_uri = 'https://tbmcg-news-dashboard.onrender.com/auth/callback'
+        # Use dynamic redirect URI based on current host
+        redirect_uri = url_for('authorized', _external=True)
         flow = msal_app.initiate_auth_code_flow(
             scopes=app.config['SCOPE'],
             redirect_uri=redirect_uri
@@ -354,9 +354,14 @@ def create_app():
             azure_roles = get_user_roles_from_token(user_claims)
             print(f"DEBUG: Azure AD roles for {email}: {azure_roles}")
             
-            # Sync user to database
-            db_user = sync_user_to_db(user_claims, azure_roles)
-            print(f"DEBUG: User {email} synced to database with roles: {db_user.get_roles()}")
+            # Try to sync user to database, but don't fail auth if DB is down
+            db_user = None
+            try:
+                db_user = sync_user_to_db(user_claims, azure_roles)
+                print(f"DEBUG: User {email} synced to database with roles: {db_user.get_roles()}")
+            except Exception as db_error:
+                print(f"WARNING: Database sync failed for {email}: {db_error}")
+                # Continue without database sync - user can still authenticate
             
             # Store user session
             session['user'] = user_claims
@@ -368,9 +373,10 @@ def create_app():
             # Clear flow from session
             session.pop('flow', None)
             
-            flash(f'Welcome, {db_user.name or email}!', 'success')
+            welcome_name = db_user.name if db_user else email
+            flash(f'Welcome, {welcome_name}!', 'success')
             
-            # Hardcoded redirect to Netlify frontend with JWT token
+            # Redirect to Netlify frontend with JWT token
             # Always generate JWT token for cross-domain authentication
             auth_token = generate_auth_token(user_claims)
             netlify_url = 'https://tbm-rss-feed.netlify.app'
