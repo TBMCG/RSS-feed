@@ -55,7 +55,27 @@
                 </div>
                 <div class="form-group">
                     <label for="categoryColor">Category Color</label>
-                    <input type="color" id="categoryColor" name="color" value="#6366f1">
+                    <div class="color-picker-container">
+                        <div class="color-preview" id="colorPreview" title="Click to open custom color picker"></div>
+                        <div class="color-swatches">
+                            <div class="color-swatch selected" data-color="#6366f1" style="background-color: #6366f1;" title="Primary Blue"></div>
+                            <div class="color-swatch" data-color="#0ea5e9" style="background-color: #0ea5e9;" title="Cyan"></div>
+                            <div class="color-swatch" data-color="#10b981" style="background-color: #10b981;" title="Green"></div>
+                            <div class="color-swatch" data-color="#f59e0b" style="background-color: #f59e0b;" title="Orange"></div>
+                            <div class="color-swatch" data-color="#8b5cf6" style="background-color: #8b5cf6;" title="Purple"></div>
+                            <div class="color-swatch" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></div>
+                            <div class="color-swatch" data-color="#3b82f6" style="background-color: #3b82f6;" title="Blue"></div>
+                            <div class="color-swatch" data-color="#06b6d4" style="background-color: #06b6d4;" title="Teal"></div>
+                            <div class="color-swatch" data-color="#84cc16" style="background-color: #84cc16;" title="Lime"></div>
+                            <div class="color-swatch" data-color="#f97316" style="background-color: #f97316;" title="Orange Red"></div>
+                            <div class="color-swatch" data-color="#ec4899" style="background-color: #ec4899;" title="Pink"></div>
+                            <div class="color-swatch" data-color="#6b7280" style="background-color: #6b7280;" title="Gray"></div>
+                        </div>
+                        <div class="custom-color-input">
+                            <input type="color" id="categoryColor" name="color" value="#6366f1" style="display: none;">
+                            <span class="custom-color-label">Custom Color</span>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -248,6 +268,7 @@ function showAddCategoryModal() {
     document.getElementById('categoryId').value = '';
     document.getElementById('categoryName').value = '';
     document.getElementById('categoryColor').value = '#6366f1';
+    initializeColorPicker();
     document.getElementById('categoryModal').style.display = 'flex';
 }
 
@@ -259,6 +280,7 @@ function editCategory(categoryId) {
     document.getElementById('categoryId').value = categoryId;
     document.getElementById('categoryName').value = category.name;
     document.getElementById('categoryColor').value = category.color;
+    initializeColorPicker(category.color);
     document.getElementById('categoryModal').style.display = 'flex';
 }
 
@@ -509,6 +531,80 @@ async function importFeeds(event) {
     
     // Reset file input
     event.target.value = '';
+}
+
+// Color picker functionality
+function initializeColorPicker(selectedColor = '#6366f1') {
+    const colorPreview = document.getElementById('colorPreview');
+    const colorInput = document.getElementById('categoryColor');
+    const colorSwatches = document.querySelectorAll('.color-swatch');
+    const customColorLabel = document.querySelector('.custom-color-label');
+    
+    // Set initial color
+    colorInput.value = selectedColor;
+    colorPreview.style.backgroundColor = selectedColor;
+    
+    // Update swatch selection
+    colorSwatches.forEach(swatch => {
+        swatch.classList.remove('selected');
+        if (swatch.dataset.color === selectedColor) {
+            swatch.classList.add('selected');
+        }
+    });
+    
+    // Remove previous event listeners by cloning elements
+    const newColorPreview = colorPreview.cloneNode(true);
+    colorPreview.parentNode.replaceChild(newColorPreview, colorPreview);
+    
+    const newCustomColorLabel = customColorLabel.cloneNode(true);
+    customColorLabel.parentNode.replaceChild(newCustomColorLabel, customColorLabel);
+    
+    // Handle swatch clicks
+    colorSwatches.forEach(swatch => {
+        swatch.removeEventListener('click', swatchClickHandler);
+        swatch.addEventListener('click', swatchClickHandler);
+    });
+    
+    // Handle preview click to trigger custom color picker
+    newColorPreview.addEventListener('click', function() {
+        colorInput.click();
+    });
+    
+    // Handle custom color label click
+    newCustomColorLabel.addEventListener('click', function() {
+        colorInput.click();
+    });
+    
+    // Handle custom color input changes
+    colorInput.removeEventListener('input', colorInputHandler);
+    colorInput.addEventListener('input', colorInputHandler);
+}
+
+function swatchClickHandler() {
+    const color = this.dataset.color;
+    selectColor(color);
+}
+
+function colorInputHandler() {
+    selectColor(this.value);
+}
+
+function selectColor(color) {
+    const colorPreview = document.getElementById('colorPreview');
+    const colorInput = document.getElementById('categoryColor');
+    const colorSwatches = document.querySelectorAll('.color-swatch');
+    
+    // Update input and preview
+    colorInput.value = color;
+    colorPreview.style.backgroundColor = color;
+    
+    // Update swatch selection
+    colorSwatches.forEach(swatch => {
+        swatch.classList.remove('selected');
+        if (swatch.dataset.color === color) {
+            swatch.classList.add('selected');
+        }
+    });
 }
 
 // Close modals when clicking outside
@@ -865,6 +961,119 @@ document.addEventListener('click', function(event) {
     
     .feed-actions {
         justify-content: space-between;
+    }
+}
+
+/* Color Picker Styles */
+.color-picker-container {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.color-preview {
+    width: 50px;
+    height: 50px;
+    border-radius: var(--radius-md);
+    border: 2px solid var(--gray-200);
+    background-color: #6366f1;
+    transition: var(--transition-hover);
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.color-preview:hover {
+    transform: scale(1.05);
+    border-color: var(--primary-main);
+}
+
+.color-preview::after {
+    content: '🎨';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.color-preview:hover::after {
+    opacity: 0.7;
+}
+
+.color-swatches {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    max-width: 140px;
+}
+
+.color-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--gray-200);
+    cursor: pointer;
+    transition: var(--transition-hover);
+    position: relative;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+    border-color: var(--gray-400);
+}
+
+.color-swatch.selected {
+    border-color: var(--primary-main);
+    transform: scale(1.1);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.color-swatch.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    text-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+
+.custom-color-input {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.custom-color-label {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: var(--transition-hover);
+}
+
+.custom-color-label:hover {
+    background: var(--gray-100);
+    color: var(--primary-main);
+}
+
+@media (max-width: 600px) {
+    .color-picker-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .color-swatches {
+        grid-template-columns: repeat(6, 1fr);
+        max-width: 200px;
     }
 }
 </style>
