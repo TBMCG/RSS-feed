@@ -30,7 +30,11 @@ def create_app():
     CORS(app, 
          origins=allowed_origins,
          supports_credentials=True,
-         allow_headers=['Content-Type', 'Authorization'])
+         allow_headers=['Content-Type', 'Authorization'],
+         resources={
+             r"/static/*": {"origins": "*"},  # Allow static files from any origin
+             r"/api/*": {"origins": allowed_origins}
+         })
     
     # Initialize Flask-Session
     Session(app)

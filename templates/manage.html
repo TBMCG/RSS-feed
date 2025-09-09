@@ -140,10 +140,58 @@
 
 {% block scripts %}
 <script>
+// Ensure TokenManager is available (fallback if app.js not loaded yet)
+if (typeof TokenManager === 'undefined') {
+    window.TokenManager = {
+        getToken: () => localStorage.getItem('auth_token') || null,
+        setToken: (token) => localStorage.setItem('auth_token', token),
+        removeToken: () => localStorage.removeItem('auth_token')
+    };
+}
+
+// Ensure API_BASE_URL is available
+if (typeof API_BASE_URL === 'undefined') {
+    window.API_BASE_URL = 'https://tbmcg-news-dashboard.onrender.com';
+}
+</script>
+<script>
 let categories = [];
 let currentEditingCategory = null;
 let currentEditingFeed = null;
 let confirmAction = null;
+
+// Helper function for API calls with proper authentication
+async function makeAPICall(url, options = {}) {
+    const headers = { ...options.headers };
+    
+    // Add token if available
+    const token = TokenManager.getToken();
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    // Ensure Content-Type is set for POST/PUT requests
+    if (options.method && ['POST', 'PUT'].includes(options.method) && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+    }
+    
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+        ...options,
+        headers: headers,
+        credentials: 'include'  // Include session cookies for backend auth
+    });
+    
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    // Only try to parse JSON if response has content
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        return response.json();
+    }
+    return response.text(); // For responses without JSON content
+}
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
@@ -155,13 +203,13 @@ async function loadCategories() {
     toggleLoading(true);
     
     try {
-        const response = await fetch('/api/feeds');
-        categories = await response.json();
+        categories = await makeAPICall('/api/feeds');
         displayCategories();
         populateCategorySelect();
     } catch (error) {
         console.error('Error loading categories:', error);
         showNotification('Failed to load categories', 'error');
+        categories = []; // Set empty array to prevent forEach error
     }
     
     toggleLoading(false);
@@ -301,22 +349,17 @@ async function saveCategory() {
         
         const method = currentEditingCategory ? 'PUT' : 'POST';
         
-        const response = await fetch(url, {
+        await makeAPICall(url, {
             method: method,
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
         
-        if (response.ok) {
-            closeCategoryModal();
-            loadCategories();
-            showNotification(
-                currentEditingCategory ? 'Category updated successfully' : 'Category added successfully', 
-                'success'
-            );
-        } else {
-            throw new Error('Failed to save category');
-        }
+        closeCategoryModal();
+        loadCategories();
+        showNotification(
+            currentEditingCategory ? 'Category updated successfully' : 'Category added successfully', 
+            'success'
+        );
     } catch (error) {
         console.error('Error saving category:', error);
         showNotification('Failed to save category', 'error');
@@ -333,17 +376,13 @@ function confirmDeleteCategory(categoryId, categoryName) {
 
 async function deleteCategory(categoryId) {
     try {
-        const response = await fetch(`/api/categories/${categoryId}`, {
+        await makeAPICall(`/api/categories/${categoryId}`, {
             method: 'DELETE'
         });
         
-        if (response.ok) {
-            closeConfirmModal();
-            loadCategories();
-            showNotification('Category deleted successfully', 'success');
-        } else {
-            throw new Error('Failed to delete category');
-        }
+        closeConfirmModal();
+        loadCategories();
+        showNotification('Category deleted successfully', 'success');
     } catch (error) {
         console.error('Error deleting category:', error);
         showNotification('Failed to delete category', 'error');
@@ -395,22 +434,17 @@ async function saveFeed() {
         
         const method = currentEditingFeed ? 'PUT' : 'POST';
         
-        const response = await fetch(url, {
+        await makeAPICall(url, {
             method: method,
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
         
-        if (response.ok) {
-            closeFeedModal();
-            loadCategories();
-            showNotification(
-                currentEditingFeed ? 'Feed updated successfully' : 'Feed added successfully', 
-                'success'
-            );
-        } else {
-            throw new Error('Failed to save feed');
-        }
+        closeFeedModal();
+        loadCategories();
+        showNotification(
+            currentEditingFeed ? 'Feed updated successfully' : 'Feed added successfully', 
+            'success'
+        );
     } catch (error) {
         console.error('Error saving feed:', error);
         showNotification('Failed to save feed', 'error');
@@ -419,21 +453,16 @@ async function saveFeed() {
 
 async function toggleFeed(feedId, enabled) {
     try {
-        const response = await fetch(`/api/feeds/${feedId}/toggle`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+        await makeAPICall(`/api/feeds/${feedId}/toggle`, {
+            method: 'POST',
             body: JSON.stringify({ enabled })
         });
         
-        if (response.ok) {
-            loadCategories();
-            showNotification(
-                enabled ? 'Feed enabled' : 'Feed disabled', 
-                'success'
-            );
-        } else {
-            throw new Error('Failed to toggle feed');
-        }
+        loadCategories();
+        showNotification(
+            enabled ? 'Feed enabled' : 'Feed disabled', 
+            'success'
+        );
     } catch (error) {
         console.error('Error toggling feed:', error);
         showNotification('Failed to update feed status', 'error');
@@ -450,17 +479,13 @@ function confirmDeleteFeed(feedId, feedName) {
 
 async function deleteFeed(feedId) {
     try {
-        const response = await fetch(`/api/feeds/${feedId}`, {
+        await makeAPICall(`/api/feeds/${feedId}`, {
             method: 'DELETE'
         });
         
-        if (response.ok) {
-            closeConfirmModal();
-            loadCategories();
-            showNotification('Feed deleted successfully', 'success');
-        } else {
-            throw new Error('Failed to delete feed');
-        }
+        closeConfirmModal();
+        loadCategories();
+        showNotification('Feed deleted successfully', 'success');
     } catch (error) {
         console.error('Error deleting feed:', error);
         showNotification('Failed to delete feed', 'error');
@@ -512,18 +537,13 @@ async function importFeeds(event) {
             throw new Error('Invalid file format');
         }
         
-        const response = await fetch('/api/feeds/import', {
+        await makeAPICall('/api/feeds/import', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
         
-        if (response.ok) {
-            loadCategories();
-            showNotification('Feeds imported successfully', 'success');
-        } else {
-            throw new Error('Failed to import feeds');
-        }
+        loadCategories();
+        showNotification('Feeds imported successfully', 'success');
     } catch (error) {
         console.error('Error importing feeds:', error);
         showNotification('Failed to import feeds. Please check the file format.', 'error');
