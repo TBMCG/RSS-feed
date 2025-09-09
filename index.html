@@ -112,11 +112,18 @@
 
                 <!-- Main Content -->
                 <div class="main-content-area">
-                    <!-- Search Bar -->
+                    <!-- Search Bar and Sort -->
                     <div class="search-container">
                         <div class="search-input">
                             <span class="material-icons">search</span>
                             <input type="text" id="searchInput" placeholder="Search articles...">
+                        </div>
+                        <div class="sort-dropdown">
+                            <label for="sortSelect" style="margin-right: 8px; color: #666;">Sort by:</label>
+                            <select id="sortSelect" class="form-select" onchange="handleSortChange()">
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                            </select>
                         </div>
                     </div>
 
@@ -180,6 +187,11 @@
                         if (response.user.role === 'Admin') {
                             document.getElementById('manageLink').style.display = 'flex';
                         }
+                        // Restore user's sorting preference
+                        const savedSort = localStorage.getItem('articleSortOrder');
+                        if (savedSort) {
+                            document.getElementById('sortSelect').value = savedSort;
+                        }
                         loadCategories();
                         loadArticles();
                         setupSearch();
@@ -188,6 +200,11 @@
                     // DOM already loaded
                     if (response.user.role === 'Admin') {
                         document.getElementById('manageLink').style.display = 'flex';
+                    }
+                    // Restore user's sorting preference
+                    const savedSort = localStorage.getItem('articleSortOrder');
+                    if (savedSort) {
+                        document.getElementById('sortSelect').value = savedSort;
                     }
                     loadCategories();
                     loadArticles();
@@ -258,7 +275,9 @@
             toggleLoading(true);
             
             try {
-                const endpoint = currentCategory ? `/api/articles?category_id=${currentCategory}` : '/api/articles';
+                const sortOrder = document.getElementById('sortSelect').value || 'newest';
+                let endpoint = currentCategory ? `/api/articles?category_id=${currentCategory}` : '/api/articles';
+                endpoint += (endpoint.includes('?') ? '&' : '?') + `sort=${sortOrder}`;
                 const articles = await apiCall(endpoint);
                 
                 allArticles = articles;
@@ -363,6 +382,13 @@
         }
 
         // Refresh feeds
+        // Handle sort change
+        function handleSortChange() {
+            const sortOrder = document.getElementById('sortSelect').value;
+            localStorage.setItem('articleSortOrder', sortOrder);  // Persist preference
+            loadArticles();
+        }
+
         async function refreshFeeds() {
             await loadArticles();
             showNotification('Feeds refreshed successfully!', 'success');

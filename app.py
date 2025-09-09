@@ -437,6 +437,7 @@ def create_app():
     def get_articles():
         """Fetch and return articles from all enabled feeds"""
         category_id = request.args.get('category_id')
+        sort_order = request.args.get('sort', 'newest')  # Default to newest first
         
         if category_id:
             feeds = Feed.query.filter_by(category_id=category_id, enabled=True).all()
@@ -462,8 +463,11 @@ def create_app():
                 print(f"Error fetching feed {feed.name}: {e}")
                 continue
         
-        # Sort articles by published date (newest first)
-        articles.sort(key=lambda x: x.get('published', ''), reverse=True)
+        # Sort articles by published date based on sort_order parameter
+        if sort_order == 'oldest':
+            articles.sort(key=lambda x: x.get('published', ''))  # Oldest first
+        else:
+            articles.sort(key=lambda x: x.get('published', ''), reverse=True)  # Newest first (default)
         
         return jsonify(articles)
 
