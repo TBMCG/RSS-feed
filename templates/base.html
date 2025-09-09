@@ -46,8 +46,8 @@
             
             <div class="nav-user">
                 <div class="user-info">
-                    <span class="user-avatar">{{ (user.get('name') or user.get('preferred_username', 'U'))[0].upper() }}</span>
-                    <span class="user-name">{{ user.get('name') or user.get('preferred_username', 'User') }}</span>
+                    <span class="user-avatar">{{ (user.session_name or user.name or user.get('name') or user.get('preferred_username', 'U'))[0].upper() }}</span>
+                    <span class="user-name">{{ user.session_name or user.name or user.get('name') or user.get('preferred_username', 'User') }}</span>
                 </div>
                 <a href="{{ url_for('logout') }}" class="btn btn-outline">
                     <span class="material-icons">logout</span>

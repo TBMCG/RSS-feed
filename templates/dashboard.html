@@ -6,7 +6,7 @@
     <div class="dashboard-header">
         <div class="header-info">
             <h1>RSS Feed Dashboard</h1>
-            <p>Welcome back, {{ user.name }}! Stay updated with the latest news.</p>
+            <p>Welcome back, {{ user.session_name or user.name or user.get('name') or user.get('preferred_username', 'User') }}! Stay updated with the latest news.</p>
         </div>
         <button class="btn btn-primary" onclick="refreshFeeds()">
             <span class="material-icons">refresh</span>

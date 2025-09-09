@@ -26,6 +26,21 @@ class User(db.Model):
         """Get list of role names for this user"""
         return [role.role_name for role in self.roles]
     
+    @property
+    def can_manage_feeds(self):
+        """Check if user can manage feeds"""
+        return self.has_role(Roles.ADMIN) or self.has_role(Roles.EDITOR)
+    
+    @property 
+    def can_manage_categories(self):
+        """Check if user can manage categories"""
+        return self.has_role(Roles.ADMIN)
+    
+    @property
+    def can_manage_users(self):
+        """Check if user can manage users"""
+        return self.has_role(Roles.ADMIN)
+    
     def __repr__(self):
         return f'<User {self.email}>'
 

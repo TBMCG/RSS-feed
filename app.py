@@ -56,12 +56,21 @@ def create_app():
     def get_user_roles_from_token(token_claims):
         """Extract roles from Azure AD token claims"""
         roles = []
+        
+        # Debug: Print all token claims to understand what we're receiving
+        print(f"DEBUG: All token claims: {token_claims}")
+        
         # Azure AD roles can be in 'roles' claim (for app roles) or 'groups' claim
         if 'roles' in token_claims:
             roles = token_claims['roles']
+            print(f"DEBUG: Found roles in token: {roles}")
         elif 'groups' in token_claims:
             # Map group IDs to role names if using groups
             roles = token_claims['groups']
+            print(f"DEBUG: Found groups in token: {roles}")
+        else:
+            print("DEBUG: No roles or groups found in token claims")
+            
         return roles
     
     def sync_user_to_db(user_claims, azure_roles):
@@ -70,33 +79,90 @@ def create_app():
         email = user_claims.get('preferred_username', '')
         name = user_claims.get('name', '')
         
+        print(f"DEBUG: Syncing user {email} (ID: {user_id}) with roles: {azure_roles}")
+        
         # Find or create user
         user = db.session.get(User, user_id)
         if not user:
             user = User(id=user_id, email=email, name=name)
             db.session.add(user)
+            print(f"DEBUG: Created new user: {email}")
         else:
             user.email = email
             user.name = name
             user.updated_at = datetime.utcnow()
+            print(f"DEBUG: Updated existing user: {email}")
         
         # Sync roles from Azure AD
         # Clear existing roles
-        UserRole.query.filter_by(user_id=user_id).delete()
+        deleted_count = UserRole.query.filter_by(user_id=user_id).delete()
+        print(f"DEBUG: Cleared {deleted_count} existing roles for user")
         
         # Add new roles from Azure AD
+        roles_added = 0
         for role_name in azure_roles:
             if role_name in Roles.ALL_ROLES:
                 user_role = UserRole(user_id=user_id, role_name=role_name)
                 db.session.add(user_role)
+                roles_added += 1
+                print(f"DEBUG: Added role '{role_name}' for user {email}")
+            else:
+                print(f"DEBUG: Skipped unknown role '{role_name}' for user {email}")
         
-        # Special case for hardcoded admin
-        if email.lower() == 'ctiller@tbmcg.com' and Roles.ADMIN not in azure_roles:
-            admin_role = UserRole(user_id=user_id, role_name=Roles.ADMIN)
-            db.session.add(admin_role)
+        print(f"DEBUG: Added {roles_added} roles total")
         
         db.session.commit()
         return user
+
+    def get_user_for_template(session_user):
+        """Get user object for template rendering with proper role handling"""
+        if not session_user:
+            return None
+            
+        user_id = session_user.get('oid')
+        user_email = session_user.get('preferred_username', '')
+        
+        print(f"DEBUG: Getting user for template - ID: {user_id}, Email: {user_email}")
+        
+        if not user_id:
+            return session_user
+            
+        # Fetch the database user object for proper role handling
+        db_user = db.session.get(User, user_id)
+        
+        if db_user:
+            print(f"DEBUG: Found database user: {db_user.email}")
+            print(f"DEBUG: User roles: {[role.role_name for role in db_user.roles]}")
+            print(f"DEBUG: Can manage feeds: {db_user.can_manage_feeds}")
+            
+            # Add session data as attributes for template compatibility
+            db_user.session_name = session_user.get('name', db_user.name)
+            db_user.session_email = session_user.get('preferred_username', db_user.email)
+            return db_user
+        else:
+            print(f"DEBUG: Database user not found for ID: {user_id}")
+            # If database user not found, create a fallback object with basic admin check
+            class FallbackUser:
+                def __init__(self, session_data):
+                    self.session_data = session_data
+                    self.name = session_data.get('name', '')
+                    self.session_name = session_data.get('name', '')
+                    self.email = session_data.get('preferred_username', '')
+                    self.session_email = session_data.get('preferred_username', '')
+                
+                def get(self, key, default=None):
+                    return self.session_data.get(key, default)
+                
+                @property
+                def can_manage_feeds(self):
+                    # No roles available in fallback mode - deny access
+                    return False
+                
+                def has_role(self, role_name):
+                    # No roles available in fallback mode
+                    return False
+            
+            return FallbackUser(session_user)
     
     def generate_auth_token(user_claims):
         """Generate JWT token for cross-domain authentication"""
@@ -261,8 +327,9 @@ def create_app():
     @requires_tbmcg_email
     def index():
         """Main dashboard page"""
-        user = session.get('user')
-        return render_template('dashboard.html', user=user)
+        session_user = session.get('user')
+        user_for_template = get_user_for_template(session_user)
+        return render_template('dashboard.html', user=user_for_template)
 
     @app.route('/login')
     def login():
@@ -477,8 +544,9 @@ def create_app():
     @requires_feed_management
     def manage_feeds():
         """Feed management page"""
-        user = session.get('user')
-        return render_template('manage.html', user=user)
+        session_user = session.get('user')
+        user_for_template = get_user_for_template(session_user)
+        return render_template('manage.html', user=user_for_template)
     
     @app.route('/api/feeds/add', methods=['POST'])
     @login_required
