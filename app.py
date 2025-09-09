@@ -24,7 +24,6 @@ def create_app():
     # Initialize CORS
     allowed_origins = [
         'http://localhost:5000',
-        'https://tbm-rss-feed.netlify.app',
         'https://tbmcg-news-dashboard.onrender.com'
     ]
     CORS(app, 
@@ -407,11 +406,8 @@ def create_app():
             
             flash(f'Welcome, {db_user.name or email}!', 'success')
             
-            # Redirect to Netlify frontend with JWT token
-            # Always generate JWT token for cross-domain authentication
-            auth_token = generate_auth_token(user_claims)
-            netlify_url = 'https://tbm-rss-feed.netlify.app'
-            return redirect(f"{netlify_url}?token={auth_token}")
+            # Redirect to index page after successful authentication
+            return redirect(url_for('index'))
             
         except Exception as e:
             session.clear()
@@ -433,10 +429,10 @@ def create_app():
                 # Ignore errors in cache clearing
                 pass
         
-        # Azure AD logout URL with proper Netlify redirect
+        # Azure AD logout URL with proper Render redirect
         azure_logout_url = (
             f"{app.config['AUTHORITY']}/oauth2/v2.0/logout"
-            f"?post_logout_redirect_uri=https://tbm-rss-feed.netlify.app/logout-complete"
+            f"?post_logout_redirect_uri=https://tbmcg-news-dashboard.onrender.com/logout-complete"
         )
         
         # Handle API request (POST) vs web request (GET)
