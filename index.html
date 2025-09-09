@@ -8,8 +8,28 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="icon" type="image/svg+xml" href="/static/custom-logo.svg">
+    <style>
+        /* Hide everything initially until authentication is verified */
+        body.auth-checking {
+            visibility: hidden;
+        }
+        .auth-checking-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            visibility: visible;
+            font-family: 'Inter', sans-serif;
+            color: #666;
+            display: none;
+        }
+        body.auth-checking .auth-checking-message {
+            display: block;
+        }
+    </style>
 </head>
-<body>
+<body class="auth-checking">
+    <div class="auth-checking-message">Authenticating...</div>
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
@@ -126,29 +146,59 @@
         let articlesPerPage = 20;
         let currentPage = 1;
 
-        // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
+        // Check auth immediately, even before DOM ready
+        (async function checkAuthImmediately() {
             // Extract token from URL if present (after OAuth redirect)
-            TokenManager.extractTokenFromURL();
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            if (token) {
+                TokenManager.setToken(token);
+                // Remove token from URL for security
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
             
-            checkAuthentication();
-            loadCategories();
-            loadArticles();
-            setupSearch();
-        });
-
-        // Check authentication status
-        async function checkAuthentication() {
+            // Check if we have a token at all
+            if (!TokenManager.getToken()) {
+                // No token, redirect immediately
+                window.location.href = `${API_BASE_URL}/login`;
+                return;
+            }
+            
+            // Verify token is valid
             try {
                 const response = await apiCall('/api/user');
-                if (response.user && response.user.role === 'Admin') {
-                    document.getElementById('manageLink').style.display = 'flex';
+                if (!response.user) {
+                    throw new Error('No user data');
+                }
+                
+                // Authentication successful, show the page
+                document.body.classList.remove('auth-checking');
+                
+                // Initialize dashboard when DOM is ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', function() {
+                        if (response.user.role === 'Admin') {
+                            document.getElementById('manageLink').style.display = 'flex';
+                        }
+                        loadCategories();
+                        loadArticles();
+                        setupSearch();
+                    });
+                } else {
+                    // DOM already loaded
+                    if (response.user.role === 'Admin') {
+                        document.getElementById('manageLink').style.display = 'flex';
+                    }
+                    loadCategories();
+                    loadArticles();
+                    setupSearch();
                 }
             } catch (error) {
-                // Redirect to login if not authenticated
+                // Invalid token or not authenticated
+                TokenManager.removeToken();
                 window.location.href = `${API_BASE_URL}/login`;
             }
-        }
+        })()
 
         // Load categories
         async function loadCategories() {
