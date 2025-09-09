@@ -796,7 +796,7 @@ def create_app():
             return jsonify({'error': 'User not found'}), 404
         
         user_roles = user.get_roles()
-        primary_role = 'Admin' if 'Admin' in user_roles else ('Editor' if 'Editor' in user_roles else 'Viewer')
+        primary_role = 'Admin' if 'admin' in user_roles else ('Editor' if 'editor' in user_roles else 'Viewer')
         
         return jsonify({
             'user': {
