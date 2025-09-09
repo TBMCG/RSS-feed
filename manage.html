@@ -123,6 +123,30 @@
                     <label for="categoryDescription">Description (Optional)</label>
                     <textarea id="categoryDescription" name="description" rows="3"></textarea>
                 </div>
+                <div class="form-group">
+                    <label for="categoryColor">Category Color</label>
+                    <div class="color-picker-container">
+                        <div class="color-preview" id="colorPreview"></div>
+                        <div class="color-swatches">
+                            <div class="color-swatch" data-color="#6366f1" style="background-color: #6366f1;" title="Primary Blue"></div>
+                            <div class="color-swatch" data-color="#0ea5e9" style="background-color: #0ea5e9;" title="Cyan"></div>
+                            <div class="color-swatch" data-color="#10b981" style="background-color: #10b981;" title="Green"></div>
+                            <div class="color-swatch" data-color="#f59e0b" style="background-color: #f59e0b;" title="Orange"></div>
+                            <div class="color-swatch" data-color="#8b5cf6" style="background-color: #8b5cf6;" title="Purple"></div>
+                            <div class="color-swatch" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></div>
+                            <div class="color-swatch" data-color="#3b82f6" style="background-color: #3b82f6;" title="Blue"></div>
+                            <div class="color-swatch" data-color="#06b6d4" style="background-color: #06b6d4;" title="Teal"></div>
+                            <div class="color-swatch" data-color="#84cc16" style="background-color: #84cc16;" title="Lime"></div>
+                            <div class="color-swatch" data-color="#f97316" style="background-color: #f97316;" title="Orange Red"></div>
+                            <div class="color-swatch" data-color="#ec4899" style="background-color: #ec4899;" title="Pink"></div>
+                            <div class="color-swatch" data-color="#6b7280" style="background-color: #6b7280;" title="Gray"></div>
+                        </div>
+                        <div class="custom-color-input">
+                            <input type="color" id="categoryColor" name="color" value="#6366f1">
+                            <label for="categoryColor" class="custom-color-label">Custom Color</label>
+                        </div>
+                    </div>
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-outline" onclick="closeModal('addCategoryModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add Category</button>
@@ -351,6 +375,7 @@
         // Modal functions
         function showAddCategoryModal() {
             document.getElementById('addCategoryModal').style.display = 'flex';
+            initializeColorPicker();
         }
 
         function showAddFeedModal() {
@@ -359,6 +384,12 @@
 
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
+            
+            // Reset form and color picker when closing add category modal
+            if (modalId === 'addCategoryModal') {
+                document.getElementById('addCategoryForm').reset();
+                initializeColorPicker();
+            }
         }
 
         // Setup form handlers
@@ -369,7 +400,8 @@
                 const formData = new FormData(this);
                 const categoryData = {
                     name: formData.get('name'),
-                    description: formData.get('description')
+                    description: formData.get('description'),
+                    color: formData.get('color')
                 };
                 
                 try {
@@ -459,6 +491,62 @@
                 console.error('Error toggling feed:', error);
                 showNotification('Failed to update feed. Please try again.', 'error');
             }
+        }
+
+        // Color picker functionality
+        function initializeColorPicker() {
+            const colorPreview = document.getElementById('colorPreview');
+            const colorInput = document.getElementById('categoryColor');
+            const colorSwatches = document.querySelectorAll('.color-swatch');
+            
+            // Set default color
+            const defaultColor = '#6366f1';
+            colorInput.value = defaultColor;
+            colorPreview.style.backgroundColor = defaultColor;
+            
+            // Mark default swatch as selected
+            colorSwatches.forEach(swatch => {
+                swatch.classList.remove('selected');
+                if (swatch.dataset.color === defaultColor) {
+                    swatch.classList.add('selected');
+                }
+            });
+            
+            // Handle swatch clicks
+            colorSwatches.forEach(swatch => {
+                swatch.addEventListener('click', function() {
+                    const color = this.dataset.color;
+                    selectColor(color);
+                });
+            });
+            
+            // Handle custom color input changes
+            colorInput.addEventListener('input', function() {
+                selectColor(this.value);
+            });
+            
+            // Handle preview click to trigger custom color picker
+            colorPreview.addEventListener('click', function() {
+                colorInput.click();
+            });
+        }
+        
+        function selectColor(color) {
+            const colorPreview = document.getElementById('colorPreview');
+            const colorInput = document.getElementById('categoryColor');
+            const colorSwatches = document.querySelectorAll('.color-swatch');
+            
+            // Update input and preview
+            colorInput.value = color;
+            colorPreview.style.backgroundColor = color;
+            
+            // Update swatch selection
+            colorSwatches.forEach(swatch => {
+                swatch.classList.remove('selected');
+                if (swatch.dataset.color === color) {
+                    swatch.classList.add('selected');
+                }
+            });
         }
 
         // Placeholder functions for edit operations
