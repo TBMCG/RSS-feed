@@ -623,9 +623,9 @@ def create_app():
     @app.route('/api/feeds/<int:feed_id>', methods=['DELETE'])
     @login_required
     @requires_tbmcg_email
-    @requires_role(Roles.ADMIN)
+    @requires_feed_management
     def delete_feed(feed_id):
-        """Delete a feed (admin only)"""
+        """Delete a feed (admin and editor)"""
         feed = Feed.query.get_or_404(feed_id)
         db.session.delete(feed)
         db.session.commit()
@@ -648,9 +648,9 @@ def create_app():
     @app.route('/api/categories', methods=['POST'])
     @login_required
     @requires_tbmcg_email
-    @requires_role(Roles.ADMIN)
+    @requires_feed_management
     def add_category():
-        """Add a new category (admin only)"""
+        """Add a new category (admin and editor)"""
         data = request.json
         user_id = session.get('user', {}).get('oid')
         
@@ -679,9 +679,9 @@ def create_app():
     @app.route('/api/categories/<int:category_id>', methods=['PUT'])
     @login_required
     @requires_tbmcg_email
-    @requires_role(Roles.ADMIN)
+    @requires_feed_management
     def update_category(category_id):
-        """Update a category (admin only)"""
+        """Update a category (admin and editor)"""
         category = Category.query.get_or_404(category_id)
         data = request.json
         
@@ -710,9 +710,9 @@ def create_app():
     @app.route('/api/categories/<int:category_id>', methods=['DELETE'])
     @login_required
     @requires_tbmcg_email
-    @requires_role(Roles.ADMIN)
+    @requires_feed_management
     def delete_category(category_id):
-        """Delete a category (admin only)"""
+        """Delete a category (admin and editor)"""
         category = Category.query.get_or_404(category_id)
         
         # Check if category has feeds

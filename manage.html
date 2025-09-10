@@ -449,7 +449,21 @@
 
         // CRUD operations
         async function deleteCategory(categoryId) {
-            if (!confirm('Are you sure you want to delete this category? This will also delete all associated feeds.')) {
+            const category = categories.find(cat => cat.id === categoryId);
+            const feedCount = feeds.filter(feed => feed.category_id === categoryId).length;
+            
+            let confirmMessage = `Are you sure you want to delete the category "${category.name}"?`;
+            if (feedCount > 0) {
+                confirmMessage = `This category contains ${feedCount} feed(s). You must delete or move these feeds before deleting the category. Would you like to view the feeds in this category?`;
+                if (confirm(confirmMessage)) {
+                    // Scroll to feeds section and highlight feeds in this category
+                    document.getElementById('feedsList').scrollIntoView({ behavior: 'smooth' });
+                    // Optionally filter feeds display to show only this category's feeds
+                }
+                return;
+            }
+            
+            if (!confirm(confirmMessage)) {
                 return;
             }
             
@@ -459,12 +473,18 @@
                 await loadCategories();
             } catch (error) {
                 console.error('Error deleting category:', error);
-                showNotification('Failed to delete category. Please try again.', 'error');
+                if (error.message && error.message.includes('feeds')) {
+                    showNotification('Cannot delete category with existing feeds. Delete or move feeds first.', 'error');
+                } else {
+                    showNotification('Failed to delete category. Please try again.', 'error');
+                }
             }
         }
 
         async function deleteFeed(feedId) {
-            if (!confirm('Are you sure you want to delete this feed?')) {
+            const feed = feeds.find(f => f.id === feedId);
+            
+            if (!confirm(`Are you sure you want to delete the feed "${feed.name}"?`)) {
                 return;
             }
             
@@ -549,13 +569,270 @@
             });
         }
 
-        // Placeholder functions for edit operations
+        // Edit category function
         function editCategory(categoryId) {
-            showNotification('Edit category functionality coming soon!', 'info');
+            const category = categories.find(cat => cat.id === categoryId);
+            if (!category) return;
+            
+            // Create edit modal if it doesn't exist
+            let modal = document.getElementById('editCategoryModal');
+            if (!modal) {
+                modal = createEditCategoryModal();
+                document.body.appendChild(modal);
+            }
+            
+            // Populate form with category data
+            document.getElementById('editCategoryId').value = category.id;
+            document.getElementById('editCategoryName').value = category.name;
+            document.getElementById('editCategoryDescription').value = category.description || '';
+            document.getElementById('editCategoryColor').value = category.color || '#6366f1';
+            
+            // Initialize color picker for edit modal
+            initializeEditColorPicker(category.color);
+            
+            // Show modal
+            modal.style.display = 'flex';
         }
 
         function editFeed(feedId) {
-            showNotification('Edit feed functionality coming soon!', 'info');
+            const feed = feeds.find(f => f.id === feedId);
+            if (!feed) return;
+            
+            // Create edit modal if it doesn't exist
+            let modal = document.getElementById('editFeedModal');
+            if (!modal) {
+                modal = createEditFeedModal();
+                document.body.appendChild(modal);
+            }
+            
+            // Populate form with feed data
+            document.getElementById('editFeedId').value = feed.id;
+            document.getElementById('editFeedName').value = feed.name;
+            document.getElementById('editFeedUrl').value = feed.url;
+            
+            // Populate category dropdown
+            const select = document.getElementById('editFeedCategory');
+            select.innerHTML = '<option value="">Select a category</option>';
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                if (category.id === feed.category_id) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+            
+            // Show modal
+            modal.style.display = 'flex';
+        }
+        
+        // Create edit modals dynamically
+        function createEditCategoryModal() {
+            const modalHTML = `
+                <div class="modal" id="editCategoryModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Edit Category</h3>
+                            <button class="modal-close" onclick="closeModal('editCategoryModal')">&times;</button>
+                        </div>
+                        <form id="editCategoryForm">
+                            <input type="hidden" id="editCategoryId" name="id">
+                            <div class="form-group">
+                                <label for="editCategoryName">Category Name</label>
+                                <input type="text" id="editCategoryName" name="name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editCategoryDescription">Description (Optional)</label>
+                                <textarea id="editCategoryDescription" name="description" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editCategoryColor">Category Color</label>
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="editColorPreview"></div>
+                                    <div class="color-swatches" id="editColorSwatches">
+                                        <div class="color-swatch" data-color="#6366f1" style="background-color: #6366f1;" title="Primary Blue"></div>
+                                        <div class="color-swatch" data-color="#0ea5e9" style="background-color: #0ea5e9;" title="Cyan"></div>
+                                        <div class="color-swatch" data-color="#10b981" style="background-color: #10b981;" title="Green"></div>
+                                        <div class="color-swatch" data-color="#f59e0b" style="background-color: #f59e0b;" title="Orange"></div>
+                                        <div class="color-swatch" data-color="#8b5cf6" style="background-color: #8b5cf6;" title="Purple"></div>
+                                        <div class="color-swatch" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></div>
+                                        <div class="color-swatch" data-color="#3b82f6" style="background-color: #3b82f6;" title="Blue"></div>
+                                        <div class="color-swatch" data-color="#06b6d4" style="background-color: #06b6d4;" title="Teal"></div>
+                                        <div class="color-swatch" data-color="#84cc16" style="background-color: #84cc16;" title="Lime"></div>
+                                        <div class="color-swatch" data-color="#f97316" style="background-color: #f97316;" title="Orange Red"></div>
+                                        <div class="color-swatch" data-color="#ec4899" style="background-color: #ec4899;" title="Pink"></div>
+                                        <div class="color-swatch" data-color="#6b7280" style="background-color: #6b7280;" title="Gray"></div>
+                                    </div>
+                                    <div class="custom-color-input">
+                                        <input type="color" id="editCategoryColor" name="color" value="#6366f1">
+                                        <label for="editCategoryColor" class="custom-color-label">Custom Color</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-outline" onclick="closeModal('editCategoryModal')">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Update Category</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            const modalDiv = document.createElement('div');
+            modalDiv.innerHTML = modalHTML;
+            const modal = modalDiv.firstElementChild;
+            
+            // Add form submit handler
+            modal.querySelector('#editCategoryForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const categoryId = formData.get('id');
+                const categoryData = {
+                    name: formData.get('name'),
+                    description: formData.get('description'),
+                    color: formData.get('color')
+                };
+                
+                try {
+                    await apiCall(`/api/categories/${categoryId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(categoryData)
+                    });
+                    
+                    showNotification('Category updated successfully!', 'success');
+                    closeModal('editCategoryModal');
+                    await loadCategories();
+                } catch (error) {
+                    console.error('Error updating category:', error);
+                    showNotification('Failed to update category. Please try again.', 'error');
+                }
+            });
+            
+            return modal;
+        }
+        
+        function createEditFeedModal() {
+            const modalHTML = `
+                <div class="modal" id="editFeedModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Edit RSS Feed</h3>
+                            <button class="modal-close" onclick="closeModal('editFeedModal')">&times;</button>
+                        </div>
+                        <form id="editFeedForm">
+                            <input type="hidden" id="editFeedId" name="id">
+                            <div class="form-group">
+                                <label for="editFeedName">Feed Name</label>
+                                <input type="text" id="editFeedName" name="name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editFeedUrl">RSS Feed URL</label>
+                                <input type="url" id="editFeedUrl" name="url" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editFeedCategory">Category</label>
+                                <select id="editFeedCategory" name="category_id" required>
+                                    <option value="">Select a category</option>
+                                </select>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-outline" onclick="closeModal('editFeedModal')">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Update Feed</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            const modalDiv = document.createElement('div');
+            modalDiv.innerHTML = modalHTML;
+            const modal = modalDiv.firstElementChild;
+            
+            // Add form submit handler
+            modal.querySelector('#editFeedForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const feedId = formData.get('id');
+                const feedData = {
+                    name: formData.get('name'),
+                    url: formData.get('url'),
+                    category_id: parseInt(formData.get('category_id'))
+                };
+                
+                try {
+                    await apiCall(`/api/feeds/${feedId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(feedData)
+                    });
+                    
+                    showNotification('Feed updated successfully!', 'success');
+                    closeModal('editFeedModal');
+                    await loadCategories();
+                } catch (error) {
+                    console.error('Error updating feed:', error);
+                    showNotification('Failed to update feed. Please try again.', 'error');
+                }
+            });
+            
+            return modal;
+        }
+        
+        // Initialize color picker for edit modal
+        function initializeEditColorPicker(currentColor) {
+            const colorPreview = document.getElementById('editColorPreview');
+            const colorInput = document.getElementById('editCategoryColor');
+            const colorSwatches = document.querySelectorAll('#editColorSwatches .color-swatch');
+            
+            // Set current color
+            colorInput.value = currentColor || '#6366f1';
+            colorPreview.style.backgroundColor = currentColor || '#6366f1';
+            
+            // Mark current swatch as selected
+            colorSwatches.forEach(swatch => {
+                swatch.classList.remove('selected');
+                if (swatch.dataset.color === currentColor) {
+                    swatch.classList.add('selected');
+                }
+            });
+            
+            // Handle swatch clicks
+            colorSwatches.forEach(swatch => {
+                swatch.onclick = function() {
+                    const color = this.dataset.color;
+                    selectEditColor(color);
+                };
+            });
+            
+            // Handle custom color input changes
+            colorInput.oninput = function() {
+                selectEditColor(this.value);
+            };
+            
+            // Handle preview click to trigger custom color picker
+            colorPreview.onclick = function() {
+                colorInput.click();
+            };
+        }
+        
+        function selectEditColor(color) {
+            const colorPreview = document.getElementById('editColorPreview');
+            const colorInput = document.getElementById('editCategoryColor');
+            const colorSwatches = document.querySelectorAll('#editColorSwatches .color-swatch');
+            
+            // Update input and preview
+            colorInput.value = color;
+            colorPreview.style.backgroundColor = color;
+            
+            // Update swatch selection
+            colorSwatches.forEach(swatch => {
+                swatch.classList.remove('selected');
+                if (swatch.dataset.color === color) {
+                    swatch.classList.add('selected');
+                }
+            });
         }
 
         // Logout function

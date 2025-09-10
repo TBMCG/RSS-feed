@@ -34,7 +34,7 @@ class User(db.Model):
     @property 
     def can_manage_categories(self):
         """Check if user can manage categories"""
-        return self.has_role(Roles.ADMIN)
+        return self.has_role(Roles.ADMIN) or self.has_role(Roles.EDITOR)
     
     @property
     def can_manage_users(self):
@@ -128,7 +128,7 @@ class Roles:
     
     @classmethod
     def can_manage_categories(cls, role):
-        return role == cls.ADMIN
+        return role in [cls.ADMIN, cls.EDITOR]
     
     @classmethod
     def can_manage_users(cls, role):
