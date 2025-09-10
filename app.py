@@ -537,8 +537,14 @@ def create_app():
     @requires_tbmcg_email
     def get_articles():
         """Fetch and return articles from all enabled feeds"""
+        from dateutil import parser as date_parser
+        import time
+        
         category_id = request.args.get('category_id')
-        sort_order = request.args.get('sort', 'newest')  # Default to newest first
+        sort_by = request.args.get('sort_by', 'date')  # date, company, title
+        sort_order = request.args.get('sort_order', 'desc')  # asc or desc
+        search_query = request.args.get('search', '').lower()
+        limit = request.args.get('limit', type=int)  # Optional limit for live feed
         
         if category_id:
             feeds = Feed.query.filter_by(category_id=category_id, enabled=True).all()
@@ -548,27 +554,89 @@ def create_app():
         articles = []
         for feed in feeds:
             try:
+                # Update last_updated timestamp
+                feed.last_updated = datetime.utcnow()
+                db.session.commit()
+                
                 parsed_feed = feedparser.parse(feed.url)
                 
                 for entry in parsed_feed.entries[:10]:  # Limit to 10 articles per feed
-                    articles.append({
-                        'title': entry.get('title', 'No title'),
+                    # Parse and normalize the date
+                    published_str = entry.get('published', entry.get('updated', ''))
+                    published_timestamp = None
+                    
+                    if published_str:
+                        try:
+                            # Parse the date string to a datetime object
+                            published_dt = date_parser.parse(published_str)
+                            published_timestamp = published_dt.timestamp()
+                        except:
+                            # If parsing fails, use current time
+                            published_timestamp = time.time()
+                    else:
+                        published_timestamp = time.time()
+                    
+                    # Extract company from title or feed name
+                    title = entry.get('title', 'No title')
+                    company = ''
+                    
+                    # Try to extract company name from title (common patterns)
+                    if ':' in title:
+                        company = title.split(':')[0].strip()
+                    elif '|' in title:
+                        company = title.split('|')[0].strip()
+                    elif ' - ' in title:
+                        parts = title.split(' - ')
+                        if len(parts) > 1:
+                            company = parts[-1].strip()
+                    
+                    # If no company found in title, use feed name
+                    if not company:
+                        company = feed.name
+                    
+                    article = {
+                        'title': title,
                         'link': entry.get('link', ''),
                         'description': entry.get('summary', entry.get('description', '')),
-                        'published': entry.get('published', ''),
+                        'published': published_str,
+                        'published_timestamp': published_timestamp,
                         'feed_name': feed.name,
                         'feed_id': feed.id,
-                        'category': feed.category.name if feed.category else None
-                    })
+                        'category': feed.category.name if feed.category else None,
+                        'company': company
+                    }
+                    
+                    # Apply search filter if provided
+                    if search_query:
+                        if (search_query in article['title'].lower() or
+                            search_query in article['description'].lower() or
+                            search_query in article['feed_name'].lower() or
+                            search_query in article['company'].lower()):
+                            articles.append(article)
+                    else:
+                        articles.append(article)
+                        
             except Exception as e:
                 print(f"Error fetching feed {feed.name}: {e}")
                 continue
         
-        # Sort articles by published date based on sort_order parameter
-        if sort_order == 'oldest':
-            articles.sort(key=lambda x: x.get('published', ''))  # Oldest first
-        else:
-            articles.sort(key=lambda x: x.get('published', ''), reverse=True)  # Newest first (default)
+        # Sort articles based on sort_by parameter
+        reverse_order = (sort_order == 'desc')
+        
+        if sort_by == 'company':
+            articles.sort(key=lambda x: (x.get('company', '').lower(), -x.get('published_timestamp', 0)), reverse=reverse_order)
+        elif sort_by == 'title':
+            articles.sort(key=lambda x: x.get('title', '').lower(), reverse=reverse_order)
+        else:  # Default to date sorting
+            articles.sort(key=lambda x: x.get('published_timestamp', 0), reverse=reverse_order)
+        
+        # Apply limit if specified (for live feed widget)
+        if limit and limit > 0:
+            articles = articles[:limit]
+        
+        # Remove the timestamp field before returning (it was just for sorting)
+        for article in articles:
+            article.pop('published_timestamp', None)
         
         return jsonify(articles)
 

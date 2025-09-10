@@ -365,7 +365,8 @@
                     filteredArticles = allArticles.filter(article => 
                         article.title.toLowerCase().includes(query) ||
                         article.description.toLowerCase().includes(query) ||
-                        article.feed_name.toLowerCase().includes(query)
+                        article.feed_name.toLowerCase().includes(query) ||
+                        (article.company && article.company.toLowerCase().includes(query))
                     );
                 }
                 
