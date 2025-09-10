@@ -215,8 +215,8 @@
                     throw new Error('No user data');
                 }
                 
-                // Check admin access
-                if (response.user.role !== 'Admin') {
+                // Check admin or editor access
+                if (response.user.role !== 'Admin' && response.user.role !== 'Editor') {
                     window.location.href = '/index.html';
                     return;
                 }

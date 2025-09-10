@@ -182,7 +182,7 @@
                 // Initialize dashboard when DOM is ready
                 if (document.readyState === 'loading') {
                     document.addEventListener('DOMContentLoaded', function() {
-                        if (response.user.role === 'Admin') {
+                        if (response.user.role === 'Admin' || response.user.role === 'Editor') {
                             document.getElementById('manageLink').style.display = 'flex';
                         }
                         // Restore user's sorting preference
@@ -196,7 +196,7 @@
                     });
                 } else {
                     // DOM already loaded
-                    if (response.user.role === 'Admin') {
+                    if (response.user.role === 'Admin' || response.user.role === 'Editor') {
                         document.getElementById('manageLink').style.display = 'flex';
                     }
                     // Restore user's sorting preference
