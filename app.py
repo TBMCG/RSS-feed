@@ -475,13 +475,20 @@ def create_app():
     @app.route('/api/feeds', methods=['GET', 'POST'])
     @login_required
     @requires_tbmcg_email
-    @requires_feed_management
     def handle_feeds():
         """Handle GET and POST requests for feeds"""
         if request.method == 'POST':
+            # POST requires feed management permissions
+            user_id = session.get('user', {}).get('oid')
+            if not user_id:
+                return jsonify({'error': 'Authentication required'}), 401
+            
+            user = db.session.get(User, user_id)
+            if not user or not user.can_manage_feeds:
+                return jsonify({'error': 'Permission denied. Admin or Editor role required.'}), 403
+            
             # Add new feed
             data = request.json
-            user_id = session.get('user', {}).get('oid')
             
             feed = Feed(
                 name=data['name'],
@@ -507,7 +514,7 @@ def create_app():
                 db.session.rollback()
                 return jsonify({'error': str(e)}), 400
         
-        # GET request - return all feeds organized by category
+        # GET request - return all feeds organized by category (any authenticated user can read)
         categories = Category.query.all()
         result = []
         
