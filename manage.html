@@ -416,7 +416,7 @@
                     await loadCategories();
                 } catch (error) {
                     console.error('Error adding category:', error);
-                    showNotification('Failed to add category. Please try again.', 'error');
+                    showNotification(error.message || 'Failed to add category. Please try again.', 'error');
                 }
             });
 
@@ -442,7 +442,7 @@
                     await loadCategories();
                 } catch (error) {
                     console.error('Error adding feed:', error);
-                    showNotification('Failed to add feed. Please try again.', 'error');
+                    showNotification(error.message || 'Failed to add feed. Please try again.', 'error');
                 }
             });
         }
@@ -473,11 +473,7 @@
                 await loadCategories();
             } catch (error) {
                 console.error('Error deleting category:', error);
-                if (error.message && error.message.includes('feeds')) {
-                    showNotification('Cannot delete category with existing feeds. Delete or move feeds first.', 'error');
-                } else {
-                    showNotification('Failed to delete category. Please try again.', 'error');
-                }
+                showNotification(error.message || 'Failed to delete category. Please try again.', 'error');
             }
         }
 
@@ -494,7 +490,7 @@
                 await loadCategories();
             } catch (error) {
                 console.error('Error deleting feed:', error);
-                showNotification('Failed to delete feed. Please try again.', 'error');
+                showNotification(error.message || 'Failed to delete feed. Please try again.', 'error');
             }
         }
 
@@ -509,7 +505,7 @@
                 await loadCategories();
             } catch (error) {
                 console.error('Error toggling feed:', error);
-                showNotification('Failed to update feed. Please try again.', 'error');
+                showNotification(error.message || 'Failed to update feed. Please try again.', 'error');
             }
         }
 
@@ -706,7 +702,7 @@
                     await loadCategories();
                 } catch (error) {
                     console.error('Error updating category:', error);
-                    showNotification('Failed to update category. Please try again.', 'error');
+                    showNotification(error.message || 'Failed to update category. Please try again.', 'error');
                 }
             });
             
@@ -773,7 +769,7 @@
                     await loadCategories();
                 } catch (error) {
                     console.error('Error updating feed:', error);
-                    showNotification('Failed to update feed. Please try again.', 'error');
+                    showNotification(error.message || 'Failed to update feed. Please try again.', 'error');
                 }
             });
             

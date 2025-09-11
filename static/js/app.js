@@ -69,11 +69,27 @@ async function apiCall(endpoint, options = {}) {
         const response = await fetch(url, config);
         
         if (!response.ok) {
+            // Try to get error message from response
+            let errorMessage = `HTTP error! status: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                if (errorData.error) {
+                    errorMessage = errorData.error;
+                } else if (errorData.message) {
+                    errorMessage = errorData.message;
+                }
+            } catch (e) {
+                // If response is not JSON, use default error message
+            }
+            
             // If token is invalid, remove it and redirect to login
             if (response.status === 401 && token) {
                 TokenManager.removeToken();
             }
-            throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const error = new Error(errorMessage);
+            error.status = response.status;
+            throw error;
         }
         
         return await response.json();
